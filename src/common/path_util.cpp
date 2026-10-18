@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <fstream>
+#include <optional>
 #include <unordered_map>
+#include <vector>
 #include "common/logging/log.h"
 #include "common/path_util.h"
 #include "common/types.h"
@@ -82,6 +84,30 @@ static std::optional<std::filesystem::path> GetBundleParentDirectory() {
 }
 #endif
 
+// Folders next to the launcher come first, then the working directory, so saves and settings
+// that already exist are used. A new folder is only made in the standard place when none exists.
+static std::optional<std::filesystem::path> FindExistingPortableDir(const char* name) {
+    std::vector<std::filesystem::path> bases;
+#ifdef _WIN32
+    wchar_t exe_path[MAX_PATH] = {0};
+    if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH) > 0) {
+        bases.push_back(std::filesystem::path(exe_path).parent_path());
+    }
+#endif
+    std::error_code ec;
+    const auto cwd = std::filesystem::current_path(ec);
+    if (!ec) {
+        bases.push_back(cwd);
+    }
+    for (const auto& base : bases) {
+        const auto dir = base / name;
+        if (std::filesystem::is_directory(dir, ec)) {
+            return dir;
+        }
+    }
+    return std::nullopt;
+}
+
 static auto UserPaths = [] {
 #if defined(__APPLE__)
     // Set the current path to the directory containing the app bundle.
@@ -91,8 +117,9 @@ static auto UserPaths = [] {
 #endif
 
     // Try the portable launcher directory first.
-    auto user_dir = std::filesystem::current_path() / PORTABLE_DIR;
-    if (!std::filesystem::exists(user_dir)) {
+    const auto portable_user_dir = FindExistingPortableDir(PORTABLE_DIR);
+    auto user_dir = portable_user_dir.value_or(std::filesystem::current_path() / PORTABLE_DIR);
+    if (!portable_user_dir) {
         // If it doesn't exist, use the standard path for the platform instead.
         // NOTE: On Windows we currently just create the portable directory instead.
 #ifdef __APPLE__
@@ -113,8 +140,10 @@ static auto UserPaths = [] {
     }
 
     // Try the portable user directory first.
-    auto launcher_dir = std::filesystem::current_path() / PORTABLE_LAUNCHER_DIR;
-    if (!std::filesystem::exists(launcher_dir)) {
+    const auto portable_launcher_dir = FindExistingPortableDir(PORTABLE_LAUNCHER_DIR);
+    auto launcher_dir =
+        portable_launcher_dir.value_or(std::filesystem::current_path() / PORTABLE_LAUNCHER_DIR);
+    if (!portable_launcher_dir) {
         // If it doesn't exist, use the standard path for the platform instead.
         // NOTE: On Windows we currently just create the portable directory instead.
 #ifdef __APPLE__

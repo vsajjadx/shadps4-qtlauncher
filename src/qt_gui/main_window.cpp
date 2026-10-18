@@ -1,8 +1,13 @@
 // SPDX-FileCopyrightText: Copyright 2025-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QDir>
 #include <QDockWidget>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QPlainTextEdit>
 #include <QProgressDialog>
@@ -99,6 +104,7 @@ bool MainWindow::Init() {
     CheckUpdateMain(true);
 #endif
 
+    UseBundledEmulator();
     LoadVersionComboBox();
     if (m_gui_settings->GetValue(gui::vm_checkOnStartup).toBool()) {
         auto versionDialog = new VersionDialog(m_gui_settings, this);
@@ -873,6 +879,13 @@ void MainWindow::CreateConnects() {
 
     // Package install.
     connect(ui->bootGameAct, &QAction::triggered, this, &MainWindow::BootGame);
+
+    // File > Install Packages (PKG), as in shadPS4 v0.7.0.
+    auto* installPkgAct =
+        new QAction(QIcon(":images/folder_icon.png"), tr("Install Packages (PKG)"), this);
+    installPkgAct->setObjectName("installPkgAct");
+    ui->menuFile->insertAction(ui->bootGameAct, installPkgAct);
+    connect(installPkgAct, &QAction::triggered, this, &MainWindow::InstallPkg);
     connect(ui->gameInstallPathAct, &QAction::triggered, this, &MainWindow::InstallDirectory);
 
     // elf viewer
@@ -1487,7 +1500,7 @@ tr("No emulator version was selected.\nThe Version Manager menu will then open.\
     EmulatorState::GetInstance()->SetGameRunning(true);
     last_game_path = path;
 
-    QString workDir = QDir::currentPath();
+    QString workDir = EmulatorWorkDir();
     m_ipc_client->startEmulator(fileInfo, final_args, workDir);
     m_ipc_client->setActiveController(GamepadSelect::GetSelectedGamepad());
 }
@@ -1564,7 +1577,7 @@ void MainWindow::StartEmulatorExecutable(std::filesystem::path emuPath, QString 
     }
 
     EmulatorState::GetInstance()->SetGameRunning(true);
-    QString workDir = QDir::currentPath();
+    QString workDir = EmulatorWorkDir();
     m_ipc_client->startEmulator(fileInfo, args, workDir, disable_ipc);
 }
 
@@ -1600,7 +1613,7 @@ void MainWindow::RestartEmulator() {
     }
 
     QFileInfo fileInfo(exe);
-    QString workDir = fileInfo.absolutePath();
+    QString workDir = EmulatorWorkDir();
 
     m_ipc_client->startEmulator(fileInfo, args, workDir);
 }
@@ -1682,4 +1695,51 @@ void MainWindow::LoadVersionComboBox() {
             });
 
     ui->versionComboBox->adjustSize();
+}
+
+void MainWindow::UseBundledEmulator() {
+    // The emulator that ships next to the launcher is listed as a version and selected the first
+    // time, or whenever the selected emulator is missing. A later choice in the list is kept.
+#ifdef Q_OS_WIN
+    const QString exeName = "shadPS4.exe";
+#else
+    const QString exeName = "shadps4";
+#endif
+    const QString bundled = QDir(QCoreApplication::applicationDirPath()).filePath(exeName);
+    if (!QFileInfo::exists(bundled)) {
+        return;
+    }
+    const QString name = "shadPS4 Anti-Crash (included)";
+    const auto versions = VersionManager::GetVersionList();
+    const bool listed = std::ranges::any_of(versions, [&](const auto& v) {
+        return v.name == name.toStdString() && v.path == bundled.toStdString();
+    });
+    if (!listed) {
+        VersionManager::AddNewVersion({
+            .name = name.toStdString(),
+            .path = bundled.toStdString(),
+            .date = QDateTime::currentDateTime().toString("yyyy-MM-dd").toStdString(),
+            .codename = "anti-crash",
+            .type = VersionManager::VersionType::Custom,
+        });
+    }
+    const QString selected = m_gui_settings->GetValue(gui::vm_versionSelected).toString();
+    if (!m_gui_settings->GetValue(gui::vm_bundledAdopted).toBool() || selected.isEmpty() ||
+        !QFileInfo::exists(selected)) {
+        m_gui_settings->SetValue(gui::vm_versionSelected, bundled);
+        m_gui_settings->SetValue(gui::vm_bundledAdopted, true);
+    }
+}
+
+QString MainWindow::EmulatorWorkDir() const {
+    // The emulator looks for a "user" folder in its working directory, so it runs where the
+    // launcher found its own one and both use the same saves and settings.
+    const auto user_dir = Common::FS::GetUserPath(Common::FS::PathType::UserDir);
+    QString dir;
+    if (user_dir.filename() == "user") {
+        Common::FS::PathToQString(dir, user_dir.parent_path());
+    } else {
+        dir = QCoreApplication::applicationDirPath();
+    }
+    return dir;
 }

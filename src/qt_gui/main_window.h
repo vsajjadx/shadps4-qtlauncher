@@ -42,6 +42,8 @@ public:
     void StopGame();
     void RestartGame();
     void LoadVersionComboBox();
+    void UseBundledEmulator();
+    QString EmulatorWorkDir() const;
     bool showLabels;
     std::shared_ptr<IpcClient> m_ipc_client;
 
@@ -81,6 +83,9 @@ private:
     void SetLastIconSizeBullet();
     void SetUiIcons(bool isWhite);
     void BootGame();
+    void InstallPkg();
+    void InstallPkgFile(const std::filesystem::path& file, const std::filesystem::path& install_dir,
+                        int pkg_num, int pkg_count);
     void AddRecentFiles(QString filePath);
     void LoadTranslation();
     void PlayBackgroundMusic();

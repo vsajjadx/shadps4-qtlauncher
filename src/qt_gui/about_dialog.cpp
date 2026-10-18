@@ -28,6 +28,18 @@ AboutDialog::AboutDialog(std::shared_ptr<gui_settings> gui_settings, QWidget* pa
     ui->image_3->installEventFilter(this);
     ui->image_4->installEventFilter(this);
     ui->image_5->installEventFilter(this);
+
+#ifdef FORK_BUNDLE_REPO
+    // The fork's package links only to its own GitHub page.
+    setWindowTitle(tr("About shadPS4 Anti-Crash"));
+    ui->shad_title->setText("shadPS4 Anti-Crash");
+    ui->shad_title->adjustSize();
+    ui->image_1->setToolTip(QStringLiteral("https://github.com/%1").arg(FORK_BUNDLE_REPO));
+    ui->image_2->setVisible(false);
+    ui->image_3->setVisible(false);
+    ui->image_4->setVisible(false);
+    ui->image_5->setVisible(false);
+#endif
 }
 
 AboutDialog::~AboutDialog() {
@@ -153,7 +165,12 @@ bool AboutDialog::eventFilter(QObject* obj, QEvent* event) {
         }
     } else if (event->type() == QEvent::MouseButtonPress) {
         if (obj == ui->image_1) {
+#ifdef FORK_BUNDLE_REPO
+            QDesktopServices::openUrl(
+                QUrl(QStringLiteral("https://github.com/%1").arg(FORK_BUNDLE_REPO)));
+#else
             QDesktopServices::openUrl(QUrl("https://github.com/shadps4-emu/shadPS4"));
+#endif
         } else if (obj == ui->image_2) {
             QDesktopServices::openUrl(QUrl("https://discord.gg/bFJxfftGW6"));
         } else if (obj == ui->image_3) {

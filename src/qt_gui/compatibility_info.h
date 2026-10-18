@@ -76,6 +76,9 @@ public:
     ~CompatibilityInfoClass();
     void UpdateCompatibilityDatabase(QWidget* parent = nullptr, bool forced = false);
     bool LoadCompatibilityFile();
+#ifdef FORK_BUNDLE_REPO
+    QByteArray ApplyForkOverrides(const QByteArray& official);
+#endif
     CompatibilityEntry GetCompatibilityInfo(const std::string& serial);
     const QString GetCompatStatusString(const CompatibilityStatus status);
     void ExtractCompatibilityInfo(QByteArray response);

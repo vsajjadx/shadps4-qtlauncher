@@ -17,6 +17,7 @@
 #include <QProcess>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QString>
 #include <QStringList>
@@ -26,6 +27,7 @@
 #include "check_update.h"
 #include "common/path_util.h"
 #include "common/scm_rev.h"
+#include "core/emulator_state.h"
 
 using namespace Common::FS;
 
@@ -41,6 +43,10 @@ CheckUpdate::CheckUpdate(std::shared_ptr<gui_settings> gui_settings, const bool 
 CheckUpdate::~CheckUpdate() {}
 
 void CheckUpdate::CheckForUpdates(const bool showMessage) {
+#ifdef FORK_BUNDLE_REV
+    CheckForkUpdates(showMessage);
+    return;
+#endif
     QUrl url;
 
     bool checkName = true;
@@ -407,6 +413,10 @@ void CheckUpdate::DownloadUpdate(const QString& url) {
 }
 
 void CheckUpdate::Install() {
+#ifdef FORK_BUNDLE_REV
+    InstallFork();
+    return;
+#endif
     QString userPath;
     Common::FS::PathToQString(userPath, Common::FS::GetUserPath(Common::FS::PathType::UserDir));
 
@@ -461,9 +471,7 @@ void CheckUpdate::Install() {
         "Remove-Item -Recurse -Force '%2'\n"
         "Start-Process -FilePath '%3\\shadPS4QtLauncher.exe' "
         "-WorkingDirectory ([WildcardPattern]::Escape('%3'))\n");
-    arguments << "-ExecutionPolicy"
-              << "Bypass"
-              << "-File" << scriptFileName;
+    arguments << "-ExecutionPolicy" << "Bypass" << "-File" << scriptFileName;
     processCommand = "powershell.exe";
 
 #elif defined(Q_OS_LINUX)
@@ -600,3 +608,212 @@ void CheckUpdate::Install() {
             QString(tr("Failed to create the update script file") + ":\n" + scriptFileName));
     }
 }
+
+#ifdef FORK_BUNDLE_REV
+// The launcher and the emulator ship together in one zip on the fork's GitHub releases. The zip
+// name ends with the short commit it was built from, which is compared with this build's commit.
+void CheckUpdate::CheckForkUpdates(bool showMessage) {
+    setWindowTitle(tr("Auto Updater"));
+    QNetworkRequest request(QUrl(
+        QStringLiteral("https://api.github.com/repos/%1/releases/latest").arg(FORK_BUNDLE_REPO)));
+    request.setRawHeader("Accept", "application/vnd.github+json");
+    QNetworkReply* reply = networkManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, showMessage]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            // A startup check stays silent when there is no network.
+            if (showMessage) {
+                QMessageBox::warning(this, tr("Auto Updater"),
+                                     tr("Could not check for updates.") + "\n" +
+                                         reply->errorString());
+            }
+            close();
+            return;
+        }
+
+        const QJsonObject release = QJsonDocument::fromJson(reply->readAll()).object();
+        const QString tag = release["tag_name"].toString();
+        QString downloadUrl;
+        QString assetName;
+        for (const QJsonValue& value : release["assets"].toArray()) {
+            const QJsonObject asset = value.toObject();
+            const QString name = asset["name"].toString();
+            if (!name.endsWith(".zip", Qt::CaseInsensitive)) {
+                continue;
+            }
+            // Prefer the Windows package when a release has several zips.
+            if (downloadUrl.isEmpty() || name.contains("win", Qt::CaseInsensitive)) {
+                downloadUrl = asset["browser_download_url"].toString();
+                assetName = name;
+            }
+        }
+        if (tag.isEmpty() || downloadUrl.isEmpty()) {
+            if (showMessage) {
+                QMessageBox::information(this, tr("Auto Updater"),
+                                         tr("No update is available yet."));
+            }
+            close();
+            return;
+        }
+
+        const QString currentRev = QStringLiteral(FORK_BUNDLE_REV);
+        static const QRegularExpression revRegex("([0-9a-fA-F]{7,40})(?=\\.zip$)");
+        const QRegularExpressionMatch match = revRegex.match(assetName);
+        bool upToDate = false;
+        if (match.hasMatch()) {
+            upToDate = currentRev.startsWith(match.captured(1), Qt::CaseInsensitive);
+        } else {
+            // Without a commit in the file name the tag names the build.
+            upToDate = m_gui_settings->GetValue(gui::vm_installedForkTag).toString() == tag;
+        }
+
+        // A release older than this build is not offered as an update.
+        const QDateTime published =
+            QDateTime::fromString(release["published_at"].toString(), Qt::ISODate);
+        if (published.isValid() && published.toSecsSinceEpoch() <= FORK_BUNDLE_TIME) {
+            upToDate = true;
+        }
+
+        if (upToDate) {
+            m_gui_settings->SetValue(gui::vm_installedForkTag, tag);
+            if (showMessage) {
+                QMessageBox::information(this, tr("Auto Updater"),
+                                         tr("Your version is already up to date!"));
+            }
+            close();
+            return;
+        }
+
+        QString date = release["published_at"].toString();
+        const QDateTime dateTime = QDateTime::fromString(date, Qt::ISODate);
+        if (dateTime.isValid()) {
+            date = dateTime.toLocalTime().toString("yyyy-MM-dd HH:mm");
+        }
+        m_pendingForkTag = tag;
+        SetupForkUI(downloadUrl,
+                    release["name"].toString().isEmpty() ? tag : release["name"].toString(), date,
+                    release["body"].toString());
+    });
+}
+
+void CheckUpdate::SetupForkUI(const QString& downloadUrl, const QString& title, const QString& date,
+                              const QString& notes) {
+    setMinimumSize(520, 0);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    QVBoxLayout* layout = new QVBoxLayout(this);
+
+    QHBoxLayout* titleLayout = new QHBoxLayout();
+    QLabel* imageLabel = new QLabel(this);
+    imageLabel->setPixmap(QPixmap(":/images/shadps4.png"));
+    imageLabel->setScaledContents(true);
+    imageLabel->setFixedSize(50, 50);
+    titleLayout->addWidget(imageLabel);
+    titleLayout->addWidget(new QLabel("<h2>" + tr("A new version is available") + "</h2>", this));
+    titleLayout->addStretch();
+    layout->addLayout(titleLayout);
+
+    layout->addWidget(new QLabel(
+        QStringLiteral("<b>%1</b><br>%2 %3").arg(title.toHtmlEscaped(), tr("Released:"), date),
+        this));
+
+    if (!notes.trimmed().isEmpty()) {
+        QTextBrowser* notesView = new QTextBrowser(this);
+        notesView->setOpenExternalLinks(true);
+        notesView->setMarkdown(notes);
+        notesView->setMinimumHeight(180);
+        layout->addWidget(notesView);
+    }
+
+    autoUpdateCheckBox = new QCheckBox(tr("Check for Updates at Startup"), this);
+    autoUpdateCheckBox->setChecked(m_gui_settings->GetValue(gui::gen_checkForUpdates).toBool());
+    connect(autoUpdateCheckBox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState state) {
+        m_gui_settings->SetValue(gui::gen_checkForUpdates, state == Qt::Checked);
+    });
+    layout->addWidget(autoUpdateCheckBox);
+
+    QHBoxLayout* buttons = new QHBoxLayout();
+    buttons->addWidget(new QLabel(tr("Do you want to update now?"), this));
+    buttons->addStretch();
+    yesButton = new QPushButton(tr("Update"), this);
+    noButton = new QPushButton(tr("Later"), this);
+    yesButton->setDefault(true);
+    buttons->addWidget(yesButton);
+    buttons->addWidget(noButton);
+    layout->addLayout(buttons);
+
+    connect(yesButton, &QPushButton::clicked, this, [this, downloadUrl]() {
+        if (EmulatorState::GetInstance()->IsGameRunning()) {
+            QMessageBox::warning(this, tr("Auto Updater"),
+                                 tr("Please close the running game before updating."));
+            return;
+        }
+        yesButton->setEnabled(false);
+        noButton->setEnabled(false);
+        DownloadUpdate(downloadUrl);
+    });
+    connect(noButton, &QPushButton::clicked, this, [this]() { close(); });
+
+    setLayout(layout);
+    adjustSize();
+}
+
+void CheckUpdate::InstallFork() {
+    QString rootPath = QCoreApplication::applicationDirPath();
+    const QString tempDirPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) +
+                                "/Temp/temp_download_update";
+    m_gui_settings->SetValue(gui::vm_installedForkTag, m_pendingForkTag);
+
+#ifdef Q_OS_WIN
+    const QString scriptFileName = tempDirPath + "/update.ps1";
+    // Waits for the launcher to close, unpacks the zip (also when its files sit in a folder),
+    // copies everything over the installation and starts the new launcher.
+    const QString scriptContent = QStringLiteral(
+        "$ErrorActionPreference = 'Continue'\n"
+        "$tmp = '%1'\n"
+        "$root = '%2'\n"
+        "Write-Output 'Updating shadPS4...'\n"
+        "Wait-Process -Id %3 -Timeout 30 -ErrorAction SilentlyContinue\n"
+        "Get-Process -Name shadPS4 -ErrorAction SilentlyContinue | Where-Object { $_.Path -and "
+        "$_.Path.StartsWith($root) } | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue\n"
+        "$ext = Join-Path $tmp 'extracted'\n"
+        "if (Test-Path -LiteralPath $ext) { Remove-Item -Recurse -Force -LiteralPath $ext }\n"
+        "Expand-Archive -LiteralPath (Join-Path $tmp 'temp_download_update.zip') "
+        "-DestinationPath $ext -Force\n"
+        "$exe = Get-ChildItem -LiteralPath $ext -Recurse -Filter 'shadPS4QtLauncher.exe' | "
+        "Select-Object -First 1\n"
+        "if (-not $exe) { $exe = Get-ChildItem -LiteralPath $ext -Recurse -Filter 'shadPS4.exe' | "
+        "Select-Object -First 1 }\n"
+        "$src = if ($exe) { $exe.DirectoryName } else { $ext }\n"
+        "Get-ChildItem -LiteralPath $src -Force | ForEach-Object { Copy-Item -LiteralPath "
+        "$_.FullName -Destination $root -Recurse -Force }\n"
+        "Remove-Item -Recurse -Force -LiteralPath $tmp\n"
+        "Start-Process -FilePath (Join-Path $root 'shadPS4QtLauncher.exe') -WorkingDirectory "
+        "$root\n");
+
+    QFile scriptFile(scriptFileName);
+    if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(
+            this, tr("Error"),
+            QString(tr("Failed to create the update script file") + ":\n" + scriptFileName));
+        return;
+    }
+    auto escape = [](QString path) { return QDir::toNativeSeparators(path).replace("'", "''"); };
+    QTextStream out(&scriptFile);
+    scriptFile.write("\xEF\xBB\xBF");
+    out << scriptContent.arg(escape(tempDirPath), escape(rootPath))
+               .arg(QCoreApplication::applicationPid());
+    out.flush();
+    scriptFile.close();
+
+    QProcess::startDetached("powershell.exe", {"-NoProfile", "-ExecutionPolicy", "Bypass",
+                                               "-WindowStyle", "Hidden", "-File", scriptFileName});
+    exit(EXIT_SUCCESS);
+#else
+    QMessageBox::information(this, tr("Auto Updater"),
+                             tr("Automatic installation is only available on Windows. Unzip the "
+                                "downloaded update into the emulator folder:") +
+                                 "\n" + tempDirPath + "/temp_download_update.zip");
+#endif
+}
+#endif

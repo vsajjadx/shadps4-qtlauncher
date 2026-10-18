@@ -54,6 +54,8 @@ public:
     // ------------------- File operations -------------------
     bool LoadFromFile();
     bool SaveToFile();
+    /// Adds the keysets found in a keys file in the same format as keys.json and saves them.
+    bool ImportFromFile(const std::filesystem::path& path);
 
     // ------------------- Key operations -------------------
     void SetDefaultKeys();

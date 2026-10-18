@@ -181,7 +181,8 @@ set_source_files_properties(src/shadps4.rc PROPERTIES COMPILE_DEFINITIONS "APP_V
 message("-- end git things, remote: ${GIT_REMOTE_NAME}, branch: ${GIT_BRANCH}, link: ${GIT_REMOTE_URL}")
 
 string(TOLOWER "${GIT_REMOTE_URL}" GIT_REMOTE_URL_LOWER)
-if(NOT GIT_REMOTE_URL_LOWER MATCHES "shadps4-emu/shadps4-qtlauncher" OR NOT GIT_BRANCH STREQUAL "main")
+# A launcher bundled with a fork updates from that fork's releases, whatever it was built from.
+if(NOT FORK_BUNDLE_REV AND (NOT GIT_REMOTE_URL_LOWER MATCHES "shadps4-emu/shadps4-qtlauncher" OR NOT GIT_BRANCH STREQUAL "main"))
     message(STATUS "not main, disabling auto update")
     set(ENABLE_UPDATER OFF)
 endif()
@@ -200,6 +201,33 @@ find_package(ZArchive 0.1.2 MODULE)
 list(POP_BACK CMAKE_MODULE_PATH)
 
 add_subdirectory(externals)
+
+# Crypto++ for PKG installation (shadPS4 v0.7.0 used the same setup).
+if (NOT TARGET cryptopp::cryptopp)
+    FetchContent_Declare(cryptopp_src
+        GIT_REPOSITORY https://github.com/weidai11/cryptopp.git
+        GIT_TAG CRYPTOPP_8_9_0
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(cryptopp_src)
+    set(CRYPTOPP_INSTALL OFF)
+    set(CRYPTOPP_BUILD_TESTING OFF)
+    set(CRYPTOPP_SOURCES ${cryptopp_src_SOURCE_DIR})
+    # Instruction set checks do not see the target's compile options.
+    set(CRYPTOPP_DISABLE_AESNI ON)
+    set(CRYPTOPP_DISABLE_AVX2 ON)
+    # The CI has no MASM, so the portable C++ code is used instead of the assembly files.
+    set(CRYPTOPP_DISABLE_ASM ON)
+    FetchContent_Declare(cryptopp_cmake
+        GIT_REPOSITORY https://github.com/abdes/cryptopp-cmake.git
+        GIT_TAG CRYPTOPP_8_9_0
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(cryptopp_cmake)
+    # Headers are included as <cryptopp/...>; the source folder also has a conflicting zlib.h.
+    file(COPY ${cryptopp_src_SOURCE_DIR}/ DESTINATION ${CMAKE_BINARY_DIR}/cryptopp_include/cryptopp
+         FILES_MATCHING PATTERN "*.h")
+    set_target_properties(cryptopp PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+                          "${CMAKE_BINARY_DIR}/cryptopp_include")
+endif()
 include_directories(src)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent LinguistTools Network Multimedia)
@@ -258,6 +286,13 @@ set(CORE src/core/file_format/elf.cpp
          src/core/file_format/npbind.cpp
          src/core/file_format/npbind.h
          src/core/file_format/psf.cpp
+         src/core/file_format/pfs.h
+         src/core/file_format/pkg.cpp
+         src/core/file_format/pkg.h
+         src/core/file_format/pkg_type.cpp
+         src/core/file_format/pkg_type.h
+         src/core/crypto/crypto.cpp
+         src/core/crypto/crypto.h
          src/core/file_format/psf.h
          src/core/file_format/trp.cpp
          src/core/file_format/trp.h
@@ -293,6 +328,7 @@ if (ENABLE_UPDATER)
 endif()
 
 set(QT_GUI src/qt_gui/about_dialog.cpp
+           src/qt_gui/pkg_install.cpp
            src/qt_gui/about_dialog.h
            src/qt_gui/about_dialog.ui
            src/qt_gui/background_music_player.cpp
@@ -407,9 +443,20 @@ if (NOT APPLE)
     target_link_libraries(shadPS4QtLauncher PRIVATE Vulkan::Headers volk_headers)
 endif()
 
+target_link_libraries(shadPS4QtLauncher PRIVATE cryptopp::cryptopp)
 target_link_libraries(shadPS4QtLauncher PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network Qt6::Multimedia nlohmann_json::nlohmann_json OpenAL::OpenAL)
 if (ENABLE_UPDATER)
     add_definitions(-DENABLE_UPDATER)
+endif()
+
+# Builds bundled with a shadPS4 fork check that fork's releases for updates of the whole package.
+set(FORK_BUNDLE_REV "" CACHE STRING "Commit of the shadPS4 fork that this launcher is bundled with")
+set(FORK_BUNDLE_REPO "vsajjadx/shadPS4" CACHE STRING "GitHub repository of the bundled shadPS4 fork")
+set(FORK_BUNDLE_TIME "0" CACHE STRING "Commit time of the bundled fork, in seconds since 1970")
+if (FORK_BUNDLE_REV)
+    target_compile_definitions(shadPS4QtLauncher PRIVATE FORK_BUNDLE_REV="${FORK_BUNDLE_REV}"
+                                                         FORK_BUNDLE_REPO="${FORK_BUNDLE_REPO}"
+                                                         FORK_BUNDLE_TIME=${FORK_BUNDLE_TIME}LL)
 endif()
 if (HIDE_VERSION_MANAGER)
     add_definitions(-DHIDE_VERSION_MANAGER)

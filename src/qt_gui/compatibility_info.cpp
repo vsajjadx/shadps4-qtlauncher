@@ -68,6 +68,9 @@ void CompatibilityInfoClass::UpdateCompatibilityDatabase(QWidget* parent, bool f
 
     // Writes the received data to the file.
     QByteArray json_data = reply->readAll();
+#ifdef FORK_BUNDLE_REPO
+    json_data = ApplyForkOverrides(json_data);
+#endif
     compatibility_file.write(json_data);
     compatibility_file.close();
     reply->deleteLater();
@@ -214,3 +217,49 @@ const QString CompatibilityInfoClass::GetCompatStatusString(const CompatibilityS
         return tr("Unknown");
     }
 }
+
+#ifdef FORK_BUNDLE_REPO
+// Games that the fork runs better than the official build are listed in its repository. Their
+// Windows status replaces the official one; the rest of the official list stays as it is.
+QByteArray CompatibilityInfoClass::ApplyForkOverrides(const QByteArray& official) {
+    QNetworkRequest request(QUrl(
+        QStringLiteral("https://raw.githubusercontent.com/%1/main/compatibility/overrides.json")
+            .arg(FORK_BUNDLE_REPO)));
+    QNetworkReply* reply = m_network_manager->get(request);
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+    reply->deleteLater();
+    if (reply->error() != QNetworkReply::NoError) {
+        return official;
+    }
+
+    QJsonDocument official_doc = QJsonDocument::fromJson(official);
+    const QJsonObject overrides = QJsonDocument::fromJson(reply->readAll()).object();
+    if (!official_doc.isObject() || overrides.isEmpty()) {
+        return official;
+    }
+
+    QJsonObject database = official_doc.object();
+    const QString repo_url = QStringLiteral("https://github.com/%1").arg(FORK_BUNDLE_REPO);
+    for (auto it = overrides.begin(); it != overrides.end(); ++it) {
+        const QJsonObject entry = it.value().toObject();
+        const QString status = entry["status"].toString();
+        if (!LabelToCompatStatus.contains(status)) {
+            continue;
+        }
+        QJsonObject game = database[it.key()].toObject();
+        game["os-windows"] = QJsonObject{
+            {"name", entry["name"]},
+            {"serial", it.key()},
+            {"status", status},
+            {"version", entry["version"].toString("Anti-Crash")},
+            {"last_tested", entry["last_tested"]},
+            {"url", entry["url"].toString(repo_url)},
+            {"issue_number", ""},
+        };
+        database[it.key()] = game;
+    }
+    return QJsonDocument(database).toJson(QJsonDocument::Compact);
+}
+#endif

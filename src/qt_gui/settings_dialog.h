@@ -5,6 +5,8 @@
 
 #include <memory>
 #include <span>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
 #include <QGroupBox>
 #include <QPushButton>
@@ -52,6 +54,8 @@ private:
     void GetPhysicalDevices();
     void SaveSettings();
     void RefreshAudioDevices();
+    void SetupGraphicsExtras();
+    void SyncResolutionComboBox();
 
     void closeEvent(QCloseEvent* event) override;
 
@@ -64,6 +68,9 @@ private:
     bool is_game_running = false;
     bool is_game_specific = false;
     bool is_game_saving = false;
+
+    QComboBox* resolutionComboBox{};
+    QCheckBox* frameGenCheckBox{};
 
     std::unique_ptr<Ui::SettingsDialog> ui;
     std::shared_ptr<gui_settings> m_gui_settings;

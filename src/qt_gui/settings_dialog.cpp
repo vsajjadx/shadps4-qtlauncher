@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2025-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <array>
 #include <iostream>
 #include <vector>
 #include <AL/al.h>
@@ -11,6 +12,7 @@
 #include <QFileDialog>
 #include <QHoverEvent>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <SDL3/SDL.h>
 #include <fmt/format.h>
 
@@ -133,6 +135,7 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
 
     ui->setupUi(this);
     ui->tabWidgetSettings->setUsesScrollButtons(false);
+    SetupGraphicsExtras();
     GetPhysicalDevices();
 
     initialHeight = this->height();
@@ -563,6 +566,7 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
         // Graphics
         ui->graphicsAdapterGroupBox->installEventFilter(this);
         ui->windowSizeGroupBox->installEventFilter(this);
+        frameGenCheckBox->installEventFilter(this);
         ui->presentModeGroupBox->installEventFilter(this);
         ui->heightDivider->installEventFilter(this);
         ui->nullGpuCheckBox->installEventFilter(this);
@@ -775,6 +779,8 @@ void SettingsDialog::LoadValuesFromConfig() {
     ui->widthSpinBox->setValue(EmulatorSettings.GetWindowWidth());
     ui->heightSpinBox->setValue(EmulatorSettings.GetWindowHeight());
     ui->enableHDRCheckBox->setChecked(EmulatorSettings.IsHdrAllowed());
+    SyncResolutionComboBox();
+    frameGenCheckBox->setChecked(EmulatorSettings.IsFrameGenerationEnabled());
 
     ui->FSRCheckBox->setChecked(EmulatorSettings.IsFsrEnabled());
     ui->RCASCheckBox->setChecked(EmulatorSettings.IsRcasEnabled());
@@ -1031,7 +1037,9 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
                   "Fifo: Frames synchronize with your screen's refresh rate. New frames will be queued behind pending frames. Ensures all frames are presented but may increase latency.\\n"
                   "Immediate: Frames immediately present to your screen when ready. May result in tearing.");
     } else if (elementName == "windowSizeGroupBox") {
-        text = tr("Width/Height:\\nSets the size of the emulator window at launch, which can be resized during gameplay.\\nThis is different from the in-game resolution.");
+        text = tr("Window Size:\\nPick the size of the emulator window at launch. It can be resized during gameplay.\\nThis is different from the in-game resolution.");
+    } else if (elementName == "frameGenCheckBox") {
+        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with AMD FSR 3.1, so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
     } else if (elementName == "heightDivider") {
         text = tr("Vblank Frequency:\\nThe frame rate at which the emulator refreshes at (60hz is the baseline, whether the game runs at 30 or 60fps). Changing this may have adverse effects, such as increasing the game speed, or breaking critical game functionality that does not expect this to change!");
     } else if (elementName == "dumpShadersCheckBox") {
@@ -1194,6 +1202,7 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
     EmulatorSettings.SetWindowHeight(ui->heightSpinBox->value(), is_specific);
     EmulatorSettings.SetHdrAllowed(ui->enableHDRCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetFsrEnabled(ui->FSRCheckBox->isChecked(), is_specific);
+    EmulatorSettings.SetFrameGenerationEnabled(frameGenCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetRcasEnabled(ui->RCASCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetRcasAttenuation(ui->RCASSlider->value(), is_specific);
 
@@ -1363,7 +1372,7 @@ void SettingsDialog::SetDefaultValues() {
         m_gui_settings->SetValue(gui::gl_backgroundImageOpacity, 50);
         m_gui_settings->SetValue(gui::gl_playBackgroundMusic, false);
         m_gui_settings->SetValue(gui::gl_backgroundMusicVolume, 50);
-        m_gui_settings->SetValue(gui::gen_checkForUpdates, false);
+        m_gui_settings->SetValue(gui::gen_checkForUpdates, gui::gen_checkForUpdates.def);
         m_gui_settings->SetValue(gui::gen_showChangeLog, false);
         m_gui_settings->SetValue(gui::gen_guiLanguage, "en_US");
         m_gui_settings->SetValue(gui::glc_showLoadGameSizeEnabled, true);
@@ -1552,4 +1561,69 @@ void SettingsDialog::GetPhysicalDevices() {
     std::string gpuName = GetAppleGpuName();
     m_physical_devices.push_back(QString::fromStdString(gpuName));
 #endif
+}
+
+void SettingsDialog::SetupGraphicsExtras() {
+    // Window size: a list of common resolutions instead of typing the width and height. The hidden
+    // spin boxes keep holding the values that are loaded and saved.
+    ui->widthLabel->setVisible(false);
+    ui->widthSpinBox->setVisible(false);
+    ui->heightLabel->setVisible(false);
+    ui->heightSpinBox->setVisible(false);
+
+    resolutionComboBox = new QComboBox(ui->windowSizeGroupBox);
+    resolutionComboBox->setObjectName("resolutionComboBox");
+    static constexpr std::array<std::pair<int, int>, 10> resolutions{{
+        {1280, 720},
+        {1366, 768},
+        {1600, 900},
+        {1920, 1080},
+        {2560, 1080},
+        {2560, 1440},
+        {3440, 1440},
+        {3200, 1800},
+        {3840, 2160},
+        {5120, 2880},
+    }};
+    for (const auto& [width, height] : resolutions) {
+        QString name = QStringLiteral("%1 x %2").arg(width).arg(height);
+        if (height == 720) {
+            name += " (HD)";
+        } else if (height == 1080 && width == 1920) {
+            name += " (Full HD)";
+        } else if (height == 1440 && width == 2560) {
+            name += " (2K)";
+        } else if (height == 2160) {
+            name += " (4K)";
+        }
+        resolutionComboBox->addItem(name, QSize(width, height));
+    }
+    ui->resLayout->addWidget(resolutionComboBox);
+
+    connect(resolutionComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int index) {
+                const QSize size = resolutionComboBox->itemData(index).toSize();
+                if (size.isValid()) {
+                    ui->widthSpinBox->setValue(size.width());
+                    ui->heightSpinBox->setValue(size.height());
+                }
+            });
+
+    // Frame generation; its in-game toggle key is set in the Hotkeys dialog.
+    frameGenCheckBox = new QCheckBox(tr("Enable Frame Generation (FSR 3.1)"), ui->FSRGroupBox);
+    frameGenCheckBox->setObjectName("frameGenCheckBox");
+    ui->verticalLayout_5->insertWidget(0, frameGenCheckBox);
+}
+
+void SettingsDialog::SyncResolutionComboBox() {
+    const QSize current(ui->widthSpinBox->value(), ui->heightSpinBox->value());
+    int index = resolutionComboBox->findData(current);
+    if (index < 0) {
+        // A size from an older config that is not in the list stays selectable.
+        resolutionComboBox->addItem(
+            tr("Custom (%1 x %2)").arg(current.width()).arg(current.height()), current);
+        index = resolutionComboBox->count() - 1;
+    }
+    QSignalBlocker blocker(resolutionComboBox);
+    resolutionComboBox->setCurrentIndex(index);
 }

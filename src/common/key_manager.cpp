@@ -169,3 +169,38 @@ std::string KeyManager::BytesToHexString(const std::vector<u8>& bytes) {
     }
     return hexStr;
 }
+
+bool KeyManager::ImportFromFile(const std::filesystem::path& path) {
+    try {
+        std::ifstream file(path);
+        if (!file.is_open()) {
+            return false;
+        }
+        json j;
+        file >> j;
+        bool found = false;
+        if (j.contains("TrophyKeySet")) {
+            j.at("TrophyKeySet").get_to(m_keys.TrophyKeySet);
+            found = true;
+        }
+        if (j.contains("FakeKeyset")) {
+            j.at("FakeKeyset").get_to(m_keys.FakeKeyset);
+            found = true;
+        }
+        if (j.contains("DebugRifKeyset")) {
+            j.at("DebugRifKeyset").get_to(m_keys.DebugRifKeyset);
+            found = true;
+        }
+        if (j.contains("PkgDerivedKey3Keyset")) {
+            j.at("PkgDerivedKey3Keyset").get_to(m_keys.PkgDerivedKey3Keyset);
+            found = true;
+        }
+        if (found) {
+            SaveToFile();
+        }
+        return found;
+    } catch (const std::exception& e) {
+        LOG_ERROR(KeyManager, "Error importing keys from {}: {}", path.string(), e.what());
+        return false;
+    }
+}

@@ -6,6 +6,13 @@
 #include <QWindow>
 #include "settings.h"
 
+// Builds bundled with the fork show the compatibility list, which carries the fork's results.
+#ifdef FORK_BUNDLE_REV
+#define FORK_DEFAULT_ON true
+#else
+#define FORK_DEFAULT_ON false
+#endif
+
 namespace gui {
 // categories
 const QString general_settings = "general_settings";
@@ -17,7 +24,12 @@ const QString favorites = "favorites";
 const QString version_manager = "version_manager";
 
 // general
+#ifdef FORK_BUNDLE_REV
+// Its own key, so a setting saved by the official launcher does not turn the fork updates off.
+const gui_value gen_checkForUpdates = gui_value(general_settings, "checkForForkUpdates", true);
+#else
 const gui_value gen_checkForUpdates = gui_value(general_settings, "checkForUpdates", false);
+#endif
 const gui_value gen_showChangeLog = gui_value(general_settings, "showChangeLog", false);
 const gui_value gen_recentFiles =
     gui_value(main_window, "recentFiles", QVariant::fromValue(QList<QString>()));
@@ -27,7 +39,7 @@ const gui_value gen_elfDirs =
 const gui_value gen_theme = gui_value(general_settings, "theme", 0);
 const gui_value gen_shadPath = gui_value(general_settings, "shadPath", "");
 const gui_value gen_checkCompatibilityAtStartup =
-    gui_value(general_settings, "checkCompatibilityAtStartup", false);
+    gui_value(general_settings, "checkCompatibilityAtStartup", FORK_DEFAULT_ON);
 const gui_value gen_homeTab = gui_value(general_settings, "homeTab", "General");
 
 // main window settings
@@ -50,7 +62,8 @@ const gui_value gl_VolumeSlider = gui_value(game_list, "volumeSlider", 100);
 // game list (column)
 const gui_value glc_showIconEnabled = gui_value(game_list_column, "showIcon", true);
 const gui_value glc_showNameEnabled = gui_value(game_list_column, "showName", true);
-const gui_value glc_showCompatibility = gui_value(game_list_column, "showCompatibility", false);
+const gui_value glc_showCompatibility =
+    gui_value(game_list_column, "showCompatibility", FORK_DEFAULT_ON);
 const gui_value glc_showSerialEnabled = gui_value(game_list_column, "showSerial", true);
 const gui_value glc_showRegionEnabled = gui_value(game_list_column, "showRegion", true);
 const gui_value glc_showFirmwareEnabled = gui_value(game_list_column, "showFirmware", true);
@@ -73,6 +86,8 @@ const gui_value vm_versionPath = gui_value(version_manager, "versionPath", "");
 const gui_value vm_versionSelected = gui_value(version_manager, "versionSelected", "");
 const gui_value vm_showChangeLog = gui_value(version_manager, "showChangeLog", "");
 const gui_value vm_checkOnStartup = gui_value(version_manager, "checkOnStartup", "");
+const gui_value vm_bundledAdopted = gui_value(version_manager, "bundledAdopted", false);
+const gui_value vm_installedForkTag = gui_value(version_manager, "installedForkTag", "");
 
 } // namespace gui
 

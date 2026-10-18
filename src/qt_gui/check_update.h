@@ -27,6 +27,11 @@ private:
     void setupUI(const QString& downloadUrl, const QString& latestDate, const QString& latestRev,
                  const QString& currentDate, const QString& currentRev);
 
+    void CheckForkUpdates(bool showMessage);
+    void SetupForkUI(const QString& downloadUrl, const QString& tag, const QString& date,
+                     const QString& notes);
+    void InstallFork();
+
     void requestChangelog(const QString& currentRev, const QString& latestRev,
                           const QString& downloadUrl, const QString& latestDate,
                           const QString& currentDate);
@@ -35,6 +40,7 @@ private:
     QPushButton* yesButton;
     QPushButton* noButton;
     QString updateDownloadUrl;
+    QString m_pendingForkTag;
 
     QNetworkAccessManager* networkManager;
     std::shared_ptr<gui_settings> m_gui_settings;
