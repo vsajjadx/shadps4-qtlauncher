@@ -962,6 +962,15 @@ void ControlSettings::processSDLEvents(int Type, int Input, int Value) {
             case SDL_GAMEPAD_BUTTON_START:
                 pressedButtons.insert(12, "options");
                 break;
+            case SdlEventWrapper::TouchpadLeft:
+                pressedButtons.insert(21, "touchpad_left");
+                break;
+            case SdlEventWrapper::TouchpadCenter:
+                pressedButtons.insert(22, "touchpad_center");
+                break;
+            case SdlEventWrapper::TouchpadRight:
+                pressedButtons.insert(23, "touchpad_right");
+                break;
             default:
                 break;
             }

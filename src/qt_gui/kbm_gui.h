@@ -74,5 +74,6 @@ private:
         "r5",           "l5",          "pad_up",       "pad_down",     "pad_left", "pad_right",
         "axis_left_x",  "axis_left_y", "axis_right_x", "axis_right_y", "back",     "share",
         "lpaddle_high", "lpaddle_low", "rpaddle_high", "rpaddle_low",  "qam",      "options",
+        "touchpad_left", "touchpad_center", "touchpad_right",
     };
 };

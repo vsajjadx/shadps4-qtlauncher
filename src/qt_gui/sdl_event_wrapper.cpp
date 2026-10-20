@@ -17,6 +17,19 @@ Wrapper* Wrapper::GetInstance() {
     return WrapperInstance;
 }
 
+static int TouchpadRegionFromX(float x) {
+    if (x < 0.0f) {
+        return TouchpadCenter; // no finger position known: treat the click as the middle
+    }
+    if (x < 1.0f / 3.0f) {
+        return TouchpadLeft;
+    }
+    if (x > 2.0f / 3.0f) {
+        return TouchpadRight;
+    }
+    return TouchpadCenter;
+}
+
 bool Wrapper::ProcessEvent(SDL_Event* event) {
     switch (event->type) {
     case SDL_EVENT_WINDOW_RESTORED:
@@ -32,10 +45,27 @@ bool Wrapper::ProcessEvent(SDL_Event* event) {
     case SDL_EVENT_QUIT:
         emit SDLEvent(SDL_EVENT_QUIT, 0, 0);
         return true;
+    case SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN:
+    case SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION:
+        lastTouchX = event->gtouchpad.x;
+        return true;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+        if (event->gbutton.button == SDL_GAMEPAD_BUTTON_TOUCHPAD) {
+            // A touchpad click is reported as the left / middle / right part of the pad that
+            // the finger was on, the way the emulator reads it in game.
+            heldTouchpadRegion = TouchpadRegionFromX(lastTouchX);
+            emit SDLEvent(SDL_EVENT_GAMEPAD_BUTTON_DOWN, heldTouchpadRegion, 0);
+            return true;
+        }
         emit SDLEvent(SDL_EVENT_GAMEPAD_BUTTON_DOWN, event->gbutton.button, 0);
         return true;
     case SDL_EVENT_GAMEPAD_BUTTON_UP:
+        if (event->gbutton.button == SDL_GAMEPAD_BUTTON_TOUCHPAD) {
+            emit SDLEvent(SDL_EVENT_GAMEPAD_BUTTON_UP,
+                          heldTouchpadRegion != 0 ? heldTouchpadRegion : TouchpadCenter, 0);
+            heldTouchpadRegion = 0;
+            return true;
+        }
         emit SDLEvent(SDL_EVENT_GAMEPAD_BUTTON_UP, event->gbutton.button, 0);
         return true;
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
