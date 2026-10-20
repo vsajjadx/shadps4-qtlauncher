@@ -83,6 +83,7 @@ private:
     void SetLastIconSizeBullet();
     void SetUiIcons(bool isWhite);
     void BootGame();
+    void ScanGames();
     void InstallPkg();
     void InstallPkgFile(const std::filesystem::path& file, const std::filesystem::path& install_dir,
                         int pkg_num, int pkg_count);

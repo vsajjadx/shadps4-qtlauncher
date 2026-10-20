@@ -7,8 +7,10 @@
 #include <QDateTime>
 #include <QDir>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QKeyEvent>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProgressDialog>
 #include <QStatusBar>
@@ -25,6 +27,7 @@
 #include "common/versions.h"
 #include "control_settings.h"
 #include "core/emulator_state.h"
+#include "core/emulator_settings.h"
 #include "core/file_sys/game_backend.h"
 #include "crypto_key_dialog.h"
 #include "dimensions_dialog.h"
@@ -886,6 +889,11 @@ void MainWindow::CreateConnects() {
     installPkgAct->setObjectName("installPkgAct");
     ui->menuFile->insertAction(ui->bootGameAct, installPkgAct);
     connect(installPkgAct, &QAction::triggered, this, &MainWindow::InstallPkg);
+
+    auto* scanGamesAct = new QAction(tr("Scan for PS4 games..."), this);
+    scanGamesAct->setObjectName("scanGamesAct");
+    ui->menuFile->insertAction(ui->bootGameAct, scanGamesAct);
+    connect(scanGamesAct, &QAction::triggered, this, &MainWindow::ScanGames);
     connect(ui->gameInstallPathAct, &QAction::triggered, this, &MainWindow::InstallDirectory);
 
     // elf viewer
@@ -1206,6 +1214,31 @@ void MainWindow::InstallDirectory() {
     GameInstallDialog dlg;
     dlg.exec();
     RefreshGameTable();
+}
+
+void MainWindow::ScanGames() {
+    const QString selectedPath =
+        QFileDialog::getExistingDirectory(this, tr("Select a folder to scan for PS4 games"),
+                                          QDir::homePath());
+    if (selectedPath.isEmpty()) {
+        return;
+    }
+
+    const QString scanPath = QDir(selectedPath).canonicalPath();
+    if (scanPath.isEmpty()) {
+        QMessageBox::warning(this, tr("Scan for PS4 games"),
+                             tr("The selected folder could not be accessed."));
+        return;
+    }
+
+    EmulatorSettings.AddGameInstallDir(Common::FS::PathFromQString(scanPath));
+    EmulatorSettings.Save();
+    ReloadGameTable(false);
+
+    QMessageBox::information(
+        this, tr("Scan complete"),
+        tr("Found %1 PS4 game(s) with CUSA title IDs in the library.")
+            .arg(m_game_info->m_games_backup.size()));
 }
 
 void MainWindow::SetLastUsedTheme() {

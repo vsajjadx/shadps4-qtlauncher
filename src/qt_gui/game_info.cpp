@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
+
 #include <QProgressDialog>
+#include <QSet>
 
 #if WIN32
 #include "common/bitlocker.h"
@@ -17,13 +20,14 @@
 #include <QMessageBox>
 
 // Maximum depth to search for games in subdirectories
-const int max_recursion_depth = 5;
+const int max_recursion_depth = 32;
 
 static bool alreadyAskedBitlocker = false;
 
-void ScanDirectoryRecursively(const QString& dir, QStringList& filePaths, int current_depth = 0) {
+void ScanDirectoryRecursively(const QString& dir, QStringList& filePaths,
+                              QSet<QString>& visitedDirectories, int current_depth = 0) {
     // Stop recursion if we've reached the maximum depth
-    if (current_depth >= max_recursion_depth) {
+    if (current_depth > max_recursion_depth) {
         return;
     }
 
@@ -66,20 +70,28 @@ void ScanDirectoryRecursively(const QString& dir, QStringList& filePaths, int cu
     }
 #endif
 
+    const QString canonicalDir = QFileInfo(dir).canonicalFilePath();
+    if (canonicalDir.isEmpty() || visitedDirectories.contains(canonicalDir)) {
+        return;
+    }
+    visitedDirectories.insert(canonicalDir);
+
     QFileInfoList entries = directory.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+    const bool isGameDirectory =
+        QFile::exists(directory.filePath("sce_sys/param.sfo")) &&
+        QFile::exists(directory.filePath("eboot.bin"));
+    if (isGameDirectory) {
+        filePaths.append(canonicalDir);
+    }
 
-    for (const auto& entry : entries) {
-        if (entry.fileName().endsWith("-UPDATE") || entry.fileName().endsWith("-patch")) {
-            continue;
-        }
+    if (!isGameDirectory) {
+        for (const auto& entry : entries) {
+            if (entry.fileName().endsWith("-UPDATE") || entry.fileName().endsWith("-patch")) {
+                continue;
+            }
 
-        // Check if this directory contains a PS4 game (has sce_sys/param.sfo and eboot.bin)
-        if (QFile::exists(entry.filePath() + "/sce_sys/param.sfo") &&
-            QFile::exists(entry.filePath() + "/eboot.bin")) {
-            filePaths.append(entry.absoluteFilePath());
-        } else {
-            // If not a game directory, recursively scan it with increased depth
-            ScanDirectoryRecursively(entry.absoluteFilePath(), filePaths, current_depth + 1);
+            ScanDirectoryRecursively(entry.absoluteFilePath(), filePaths, visitedDirectories,
+                                     current_depth + 1);
         }
     }
 
@@ -110,15 +122,24 @@ GameInfoClass::~GameInfoClass() = default;
 void GameInfoClass::GetGameInfo(QWidget* parent, bool force_size_refresh,
                                 const std::string& force_size_serial) {
     QStringList filePaths;
+    QSet<QString> visitedDirectories;
     for (const auto& installLoc : EmulatorSettings.GetGameInstallDirs()) {
         QString installDir;
         Common::FS::PathToQString(installDir, installLoc);
-        ScanDirectoryRecursively(installDir, filePaths, 0);
+        ScanDirectoryRecursively(installDir, filePaths, visitedDirectories, 0);
     }
+    filePaths.removeDuplicates();
 
     m_games = QtConcurrent::mapped(filePaths, [&](const QString& path) {
                   return readGameInfo(Common::FS::PathFromQString(path));
               }).results();
+    m_games.erase(std::remove_if(m_games.begin(), m_games.end(), [](const GameInfo& game) {
+                      const std::string& titleId = game.serial;
+                      return titleId.size() != 9 || titleId.compare(0, 4, "CUSA") != 0 ||
+                             !std::all_of(titleId.begin() + 4, titleId.end(),
+                                          [](char digit) { return digit >= '0' && digit <= '9'; });
+                  }),
+                  m_games.end());
 
     // Progress bar, please be patient :)
     QProgressDialog dialog(tr("Loading game list, please wait :3"), tr("Cancel"), 0, 0, parent);
