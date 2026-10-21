@@ -75,9 +75,6 @@ private:
     void RunGame();
     void PrintLog(QString entry, QColor textColor);
 
-#ifdef ENABLE_UPDATER
-    void CheckUpdateMain(bool checkSave);
-#endif
     void CreateConnects();
     void SetLastUsedTheme();
     void SetLastIconSizeBullet();

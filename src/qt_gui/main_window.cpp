@@ -113,17 +113,9 @@ bool MainWindow::Init() {
     // load game list
     LoadGameLists();
 
-#ifdef ENABLE_UPDATER
-    // Check for update
-    CheckUpdateMain(true);
-#endif
-
+    // Updates are only looked for from Help > Check for Updates and the Version Manager.
     UseBundledEmulator();
     LoadVersionComboBox();
-    if (m_gui_settings->GetValue(gui::vm_checkOnStartup).toBool()) {
-        auto versionDialog = new VersionDialog(m_gui_settings, this);
-        versionDialog->checkUpdatePre(false);
-    }
 
     auto end = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -481,18 +473,6 @@ void MainWindow::LoadGameLists() {
         m_game_grid_frame->PopulateGameGrid(m_game_info->m_games, false);
     }
 }
-
-#ifdef ENABLE_UPDATER
-void MainWindow::CheckUpdateMain(bool checkSave) {
-    if (checkSave) {
-        if (!m_gui_settings->GetValue(gui::gen_checkForUpdates).toBool()) {
-            return;
-        }
-    }
-    auto checkUpdate = new CheckUpdate(m_gui_settings, false);
-    checkUpdate->exec();
-}
-#endif
 
 void MainWindow::CreateConnects() {
     connect(this, &MainWindow::WindowResized, this, &MainWindow::HandleResize);
