@@ -1957,7 +1957,8 @@ void MainWindow::LoadVersionComboBox() {
 
 void MainWindow::UseBundledEmulator() {
     // The emulator that ships next to the launcher is listed as a version and selected the first
-    // time, or whenever the selected emulator is missing. A later choice in the list is kept.
+    // time, after it is replaced by an update, or whenever the selected emulator is missing. A
+    // later choice in the list is kept until the next update.
 #ifdef Q_OS_WIN
     const QString exeName = "shadPS4.exe";
 #else
@@ -1982,10 +1983,12 @@ void MainWindow::UseBundledEmulator() {
         });
     }
     const QString selected = m_gui_settings->GetValue(gui::vm_versionSelected).toString();
-    if (!m_gui_settings->GetValue(gui::vm_bundledAdopted).toBool() || selected.isEmpty() ||
-        !QFileInfo::exists(selected)) {
+    const QString bundledStamp =
+        QString::number(QFileInfo(bundled).lastModified().toSecsSinceEpoch());
+    if (m_gui_settings->GetValue(gui::vm_bundledAdopted).toString() != bundledStamp ||
+        selected.isEmpty() || !QFileInfo::exists(selected)) {
         m_gui_settings->SetValue(gui::vm_versionSelected, bundled);
-        m_gui_settings->SetValue(gui::vm_bundledAdopted, true);
+        m_gui_settings->SetValue(gui::vm_bundledAdopted, bundledStamp);
     }
 }
 
