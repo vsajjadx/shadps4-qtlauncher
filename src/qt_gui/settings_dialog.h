@@ -56,6 +56,7 @@ private:
     void RefreshAudioDevices();
     void SetupGraphicsExtras();
     void SyncResolutionComboBox();
+    void SyncImageQualityComboBoxes();
 
     void closeEvent(QCloseEvent* event) override;
 
@@ -71,6 +72,10 @@ private:
 
     QComboBox* resolutionComboBox{};
     QCheckBox* frameGenCheckBox{};
+    QCheckBox* antiAliasingCheckBox{};
+    QComboBox* resolutionScaleComboBox{};
+    QComboBox* anisotropicComboBox{};
+    QGroupBox* imageQualityGroupBox{};
 
     std::unique_ptr<Ui::SettingsDialog> ui;
     std::shared_ptr<gui_settings> m_gui_settings;

@@ -433,6 +433,9 @@ struct GPUSettings {
     Setting<bool> userfaultfd{false};
     Setting<bool> inline_fetch_shader{false};
     Setting<bool> frame_generation_enabled{false};
+    Setting<bool> anti_aliasing{false};
+    Setting<u32> resolution_scale{100};
+    Setting<u32> anisotropic_filtering{0};
 
     std::vector<OverrideItem> GetOverrideableFields() const {
         return std::vector<OverrideItem>{
@@ -459,6 +462,10 @@ struct GPUSettings {
             make_override<GPUSettings>("inline_fetch_shader", &GPUSettings::inline_fetch_shader),
             make_override<GPUSettings>("frame_generation_enabled",
                                        &GPUSettings::frame_generation_enabled),
+            make_override<GPUSettings>("anti_aliasing", &GPUSettings::anti_aliasing),
+            make_override<GPUSettings>("resolution_scale", &GPUSettings::resolution_scale),
+            make_override<GPUSettings>("anisotropic_filtering",
+                                       &GPUSettings::anisotropic_filtering),
         };
     }
 };
@@ -468,7 +475,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GPUSettings, window_width, window_height, int
                                    direct_memory_access_enabled, dump_shaders, patch_shaders,
                                    vblank_frequency, full_screen, full_screen_mode, present_mode,
                                    hdr_allowed, fsr_enabled, rcas_enabled, rcas_attenuation,
-                                   userfaultfd, inline_fetch_shader, frame_generation_enabled)
+                                   userfaultfd, inline_fetch_shader, frame_generation_enabled,
+                                   anti_aliasing, resolution_scale, anisotropic_filtering)
 
 // -------------------------------
 // Vulkan settings
@@ -748,6 +756,9 @@ public:
     SETTING_FORWARD_BOOL(m_gpu, UserfaultfdTracking, userfaultfd)
     SETTING_FORWARD_BOOL_READONLY(m_gpu, InlineFetchShader, inline_fetch_shader)
     SETTING_FORWARD_BOOL(m_gpu, FrameGenerationEnabled, frame_generation_enabled)
+    SETTING_FORWARD_BOOL(m_gpu, AntiAliasing, anti_aliasing)
+    SETTING_FORWARD(m_gpu, ResolutionScale, resolution_scale)
+    SETTING_FORWARD(m_gpu, AnisotropicFiltering, anisotropic_filtering)
 
     u32 GetVblankFrequency() {
         if (m_gpu.vblank_frequency.value < 30) {
