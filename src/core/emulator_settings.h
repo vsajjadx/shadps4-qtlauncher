@@ -436,6 +436,8 @@ struct GPUSettings {
     Setting<bool> anti_aliasing{false};
     Setting<u32> resolution_scale{100};
     Setting<u32> anisotropic_filtering{0};
+    Setting<int> brightness{100};
+    Setting<int> contrast{100};
 
     std::vector<OverrideItem> GetOverrideableFields() const {
         return std::vector<OverrideItem>{
@@ -466,6 +468,8 @@ struct GPUSettings {
             make_override<GPUSettings>("resolution_scale", &GPUSettings::resolution_scale),
             make_override<GPUSettings>("anisotropic_filtering",
                                        &GPUSettings::anisotropic_filtering),
+            make_override<GPUSettings>("brightness", &GPUSettings::brightness),
+            make_override<GPUSettings>("contrast", &GPUSettings::contrast),
         };
     }
 };
@@ -476,7 +480,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GPUSettings, window_width, window_height, int
                                    vblank_frequency, full_screen, full_screen_mode, present_mode,
                                    hdr_allowed, fsr_enabled, rcas_enabled, rcas_attenuation,
                                    userfaultfd, inline_fetch_shader, frame_generation_enabled,
-                                   anti_aliasing, resolution_scale, anisotropic_filtering)
+                                   anti_aliasing, resolution_scale, anisotropic_filtering,
+                                   brightness, contrast)
 
 // -------------------------------
 // Vulkan settings
@@ -759,6 +764,8 @@ public:
     SETTING_FORWARD_BOOL(m_gpu, AntiAliasing, anti_aliasing)
     SETTING_FORWARD(m_gpu, ResolutionScale, resolution_scale)
     SETTING_FORWARD(m_gpu, AnisotropicFiltering, anisotropic_filtering)
+    SETTING_FORWARD(m_gpu, Brightness, brightness)
+    SETTING_FORWARD(m_gpu, Contrast, contrast)
 
     u32 GetVblankFrequency() {
         if (m_gpu.vblank_frequency.value < 30) {

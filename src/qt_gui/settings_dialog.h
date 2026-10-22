@@ -10,6 +10,7 @@
 #include <QDialog>
 #include <QGroupBox>
 #include <QPushButton>
+#include <QSlider>
 
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -75,6 +76,8 @@ private:
     QCheckBox* antiAliasingCheckBox{};
     QComboBox* resolutionScaleComboBox{};
     QComboBox* anisotropicComboBox{};
+    QSlider* brightnessSlider{};
+    QSlider* contrastSlider{};
     QGroupBox* imageQualityGroupBox{};
 
     std::unique_ptr<Ui::SettingsDialog> ui;

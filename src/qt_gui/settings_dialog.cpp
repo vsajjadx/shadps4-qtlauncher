@@ -16,6 +16,7 @@
 #include <QHoverEvent>
 #include <QMessageBox>
 #include <QSignalBlocker>
+#include <QSlider>
 #include <SDL3/SDL.h>
 #include <fmt/format.h>
 
@@ -573,6 +574,8 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
         antiAliasingCheckBox->installEventFilter(this);
         resolutionScaleComboBox->installEventFilter(this);
         anisotropicComboBox->installEventFilter(this);
+        brightnessSlider->installEventFilter(this);
+        contrastSlider->installEventFilter(this);
         ui->presentModeGroupBox->installEventFilter(this);
         ui->heightDivider->installEventFilter(this);
         ui->nullGpuCheckBox->installEventFilter(this);
@@ -789,6 +792,8 @@ void SettingsDialog::LoadValuesFromConfig() {
     frameGenCheckBox->setChecked(EmulatorSettings.IsFrameGenerationEnabled());
     antiAliasingCheckBox->setChecked(EmulatorSettings.IsAntiAliasing());
     SyncImageQualityComboBoxes();
+    brightnessSlider->setValue(EmulatorSettings.GetBrightness());
+    contrastSlider->setValue(EmulatorSettings.GetContrast());
 
     ui->FSRCheckBox->setChecked(EmulatorSettings.IsFsrEnabled());
     ui->RCASCheckBox->setChecked(EmulatorSettings.IsRcasEnabled());
@@ -1050,6 +1055,10 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
         text = tr("Anti-Aliasing (FXAA):\\nSmooths jagged edges in the final image. It is applied after the game is drawn, so it works in every game and costs very little performance.");
     } else if (elementName == "resolutionScaleComboBox") {
         text = tr("Resolution Scaling:\\nScales the screen resolution that the emulator reports to the game. Games that choose their render resolution from it draw at the scaled size; games that always draw at a fixed size are not changed. Applies the next time a game starts.");
+    } else if (elementName == "brightnessSlider") {
+        text = tr("Brightness:\\nMakes the image brighter or darker. 100% shows it as the game draws it. Black and white stay as they are; the tones in between change, so dark scenes become easier to see without washing out bright areas. It can also be changed while playing: right-click the game window's title bar and choose Brightness / Contrast.");
+    } else if (elementName == "contrastSlider") {
+        text = tr("Contrast:\\nMakes the difference between dark and bright tones larger or smaller. 100% shows the image as the game draws it. Higher values make the picture punchier, lower values flatter. It can also be changed while playing from the game window's title bar menu.");
     } else if (elementName == "anisotropicComboBox") {
         text = tr("Anisotropic Filtering:\\nMakes textures sharper on surfaces seen at a steep angle, such as roads and floors. Higher values look better and cost a little GPU time. Off leaves it as the game sets it.");
     } else if (elementName == "frameGenCheckBox") {
@@ -1222,6 +1231,8 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
                                         is_specific);
     EmulatorSettings.SetAnisotropicFiltering(anisotropicComboBox->currentData().toUInt(),
                                              is_specific);
+    EmulatorSettings.SetBrightness(brightnessSlider->value(), is_specific);
+    EmulatorSettings.SetContrast(contrastSlider->value(), is_specific);
     EmulatorSettings.SetRcasEnabled(ui->RCASCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetRcasAttenuation(ui->RCASSlider->value(), is_specific);
 
@@ -1661,6 +1672,44 @@ void SettingsDialog::SetupGraphicsExtras() {
     }
     anisotropicLayout->addWidget(anisotropicComboBox, 1);
     imageQualityLayout->addLayout(anisotropicLayout);
+
+    auto* brightnessLayout = new QHBoxLayout();
+    brightnessLayout->addWidget(new QLabel(tr("Brightness:"), imageQualityGroupBox));
+    brightnessSlider = new QSlider(Qt::Horizontal, imageQualityGroupBox);
+    brightnessSlider->setObjectName("brightnessSlider");
+    brightnessSlider->setRange(25, 300);
+    brightnessSlider->setSingleStep(5);
+    brightnessSlider->setPageStep(25);
+    auto* brightnessValueLabel = new QLabel(imageQualityGroupBox);
+    brightnessValueLabel->setMinimumWidth(40);
+    connect(brightnessSlider, &QSlider::valueChanged, brightnessValueLabel,
+            [brightnessValueLabel](int value) {
+                brightnessValueLabel->setText(QStringLiteral("%1%").arg(value));
+            });
+    brightnessSlider->setValue(100);
+    brightnessValueLabel->setText(QStringLiteral("100%"));
+    brightnessLayout->addWidget(brightnessSlider, 1);
+    brightnessLayout->addWidget(brightnessValueLabel);
+    imageQualityLayout->addLayout(brightnessLayout);
+
+    auto* contrastLayout = new QHBoxLayout();
+    contrastLayout->addWidget(new QLabel(tr("Contrast:"), imageQualityGroupBox));
+    contrastSlider = new QSlider(Qt::Horizontal, imageQualityGroupBox);
+    contrastSlider->setObjectName("contrastSlider");
+    contrastSlider->setRange(25, 300);
+    contrastSlider->setSingleStep(5);
+    contrastSlider->setPageStep(25);
+    auto* contrastValueLabel = new QLabel(imageQualityGroupBox);
+    contrastValueLabel->setMinimumWidth(40);
+    connect(contrastSlider, &QSlider::valueChanged, contrastValueLabel,
+            [contrastValueLabel](int value) {
+                contrastValueLabel->setText(QStringLiteral("%1%").arg(value));
+            });
+    contrastSlider->setValue(100);
+    contrastValueLabel->setText(QStringLiteral("100%"));
+    contrastLayout->addWidget(contrastSlider, 1);
+    contrastLayout->addWidget(contrastValueLabel);
+    imageQualityLayout->addLayout(contrastLayout);
 
     ui->graphicsTabLayoutRight->insertWidget(
         ui->graphicsTabLayoutRight->indexOf(ui->FSRGroupBox) + 1, imageQualityGroupBox);
