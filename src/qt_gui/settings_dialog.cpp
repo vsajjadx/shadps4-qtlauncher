@@ -9,8 +9,11 @@
 #include <QCompleter>
 #include <QDesktopServices>
 #include <QDirIterator>
+#include <QFile>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QHoverEvent>
@@ -22,6 +25,7 @@
 
 #include "common/assert.h"
 #include "common/logging/log.h"
+#include "common/path_util.h"
 #include "qt_gui/compatibility_info.h"
 #ifdef ENABLE_UPDATER
 #include "check_update.h"
@@ -790,6 +794,7 @@ void SettingsDialog::LoadValuesFromConfig() {
     ui->enableHDRCheckBox->setChecked(EmulatorSettings.IsHdrAllowed());
     SyncResolutionComboBox();
     frameGenCheckBox->setChecked(EmulatorSettings.IsFrameGenerationEnabled());
+    LoadDlss5Settings();
     antiAliasingCheckBox->setChecked(EmulatorSettings.IsAntiAliasing());
     SyncImageQualityComboBoxes();
     brightnessSlider->setValue(EmulatorSettings.GetBrightness());
@@ -1226,6 +1231,7 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
     EmulatorSettings.SetHdrAllowed(ui->enableHDRCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetFsrEnabled(ui->FSRCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetFrameGenerationEnabled(frameGenCheckBox->isChecked(), is_specific);
+    SaveDlss5Settings();
     EmulatorSettings.SetAntiAliasing(antiAliasingCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetResolutionScale(resolutionScaleComboBox->currentData().toUInt(),
                                         is_specific);
@@ -1640,7 +1646,7 @@ void SettingsDialog::SetupGraphicsExtras() {
             });
 
     // Frame generation; its in-game toggle key is set in the Hotkeys dialog.
-    frameGenCheckBox = new QCheckBox(tr("Enable Frame Generation (FSR 3.1)"), ui->FSRGroupBox);
+    frameGenCheckBox = new QCheckBox(tr("Enable Frame Generation"), ui->FSRGroupBox);
     frameGenCheckBox->setObjectName("frameGenCheckBox");
     ui->verticalLayout_5->insertWidget(0, frameGenCheckBox);
 
@@ -1713,6 +1719,135 @@ void SettingsDialog::SetupGraphicsExtras() {
 
     ui->graphicsTabLayoutRight->insertWidget(
         ui->graphicsTabLayoutRight->indexOf(ui->FSRGroupBox) + 1, imageQualityGroupBox);
+
+    // DLSS5 (NeuralScreen); the options live in the emulator's
+    // user/neural_screen.json and are applied when a game starts.
+    dlss5GroupBox = new QGroupBox(tr("DLSS5 (NeuralScreen)"), this);
+    dlss5GroupBox->setObjectName("dlss5GroupBox");
+    auto* dlss5Layout = new QVBoxLayout(dlss5GroupBox);
+
+    dlss5CheckBox = new QCheckBox(tr("Enable DLSS5 (Neural Rendering)"), dlss5GroupBox);
+    dlss5CheckBox->setObjectName("dlss5CheckBox");
+    dlss5Layout->addWidget(dlss5CheckBox);
+
+    dlss5BoostCheckBox = new QCheckBox(tr("DLSS5 Boost"), dlss5GroupBox);
+    dlss5BoostCheckBox->setObjectName("dlss5BoostCheckBox");
+    dlss5Layout->addWidget(dlss5BoostCheckBox);
+
+    const auto addDlss5Row = [this, dlss5Layout](QWidget* label, QWidget* control) {
+        auto* row = new QHBoxLayout();
+        row->addWidget(label, 0);
+        row->addWidget(control, 1);
+        dlss5Layout->addLayout(row);
+    };
+
+    auto* resolutionLabel = new QLabel(tr("Resolution Network Runs At:"), dlss5GroupBox);
+    dlss5ResolutionComboBox = new QComboBox(dlss5GroupBox);
+    dlss5ResolutionComboBox->setObjectName("dlss5ResolutionComboBox");
+    for (int percent = 100; percent >= 30; percent -= 5) {
+        dlss5ResolutionComboBox->addItem(QStringLiteral("%1%").arg(percent), percent);
+    }
+    addDlss5Row(resolutionLabel, dlss5ResolutionComboBox);
+
+    auto* passesLabel = new QLabel(tr("DLSS5 Passes:"), dlss5GroupBox);
+    dlss5PassesComboBox = new QComboBox(dlss5GroupBox);
+    dlss5PassesComboBox->setObjectName("dlss5PassesComboBox");
+    for (int passes = 1; passes <= 4; ++passes) {
+        dlss5PassesComboBox->addItem(QString::number(passes), passes);
+    }
+    addDlss5Row(passesLabel, dlss5PassesComboBox);
+
+    auto* profileLabel = new QLabel(tr("DLSS5 Profile:"), dlss5GroupBox);
+    dlss5ProfileComboBox = new QComboBox(dlss5GroupBox);
+    dlss5ProfileComboBox->setObjectName("dlss5ProfileComboBox");
+    const QString profiles[] = {QStringLiteral("Faithful"),        QStringLiteral("Natural"),
+                                QStringLiteral("Strong / Cinematic"),
+                                QStringLiteral("Extreme / Overdrive")};
+    for (int index = 0; index < 4; ++index) {
+        dlss5ProfileComboBox->addItem(profiles[index], index);
+    }
+    addDlss5Row(profileLabel, dlss5ProfileComboBox);
+
+    const auto addDlss5SliderRow = [this, dlss5Layout](const QString& label, QSlider*& slider,
+                                                      int min, int max, int initial) {
+        auto* row = new QHBoxLayout();
+        row->addWidget(new QLabel(label, dlss5GroupBox), 0);
+        slider = new QSlider(Qt::Horizontal, dlss5GroupBox);
+        slider->setRange(min, max);
+        auto* valueLabel = new QLabel(dlss5GroupBox);
+        valueLabel->setMinimumWidth(40);
+        QObject::connect(slider, &QSlider::valueChanged, valueLabel, [valueLabel](int value) {
+            valueLabel->setText(QString::number(value * 0.01, 'f', 2));
+        });
+        slider->setValue(initial);
+        valueLabel->setText(QString::number(initial * 0.01, 'f', 2));
+        row->addWidget(slider, 1);
+        row->addWidget(valueLabel);
+        dlss5Layout->addLayout(row);
+    };
+    addDlss5SliderRow(tr("DLSS5 Intensity:"), dlss5IntensitySlider, 0, 100, 100);
+    addDlss5SliderRow(tr("DLSS5 Fine Tune: Local Tone:"), dlss5LocalToneSlider, 0, 200, 50);
+    addDlss5SliderRow(tr("DLSS5 Fine Tune: Local Structure:"), dlss5LocalStructureSlider, 0, 200,
+                      100);
+    addDlss5SliderRow(tr("DLSS5 Fine Tune: Skin Structure:"), dlss5SkinStructureSlider, -100, 250,
+                      -100);
+
+    ui->graphicsTabLayoutRight->insertWidget(
+        ui->graphicsTabLayoutRight->indexOf(imageQualityGroupBox) + 1, dlss5GroupBox);
+}
+
+void SettingsDialog::LoadDlss5Settings() {
+    QJsonObject j;
+    const std::filesystem::path path =
+        Common::FS::GetUserPath(Common::FS::PathType::UserDir) / "neural_screen.json";
+    if (QFile file(QString::fromStdString(path.string())); file.open(QIODevice::ReadOnly)) {
+        j = QJsonDocument::fromJson(file.readAll()).object();
+    }
+
+    const auto selectData = [](QComboBox* box, const QVariant& data) {
+        QSignalBlocker blocker(box);
+        const int index = box->findData(data);
+        box->setCurrentIndex(index >= 0 ? index : 0);
+    };
+    const auto setSlider = [](QSlider* slider, double value, double min, double max) {
+        QSignalBlocker blocker(slider);
+        slider->setValue(qRound(qBound(min, value, max) * 100.0));
+    };
+
+    dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
+    dlss5BoostCheckBox->setChecked(j.value("Boost").toBool(false));
+    selectData(dlss5ResolutionComboBox,
+               qBound(30, j.value("NetworkResolutionPercent").toInt(65), 100));
+    selectData(dlss5PassesComboBox, qBound(1, j.value("Passes").toInt(1), 4));
+    selectData(dlss5ProfileComboBox, qBound(0, j.value("Profile").toInt(1), 3));
+    setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
+    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(0.5), 0.0, 2.0);
+    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.0), 0.0, 2.0);
+    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(-1.0), -1.0, 2.5);
+}
+
+void SettingsDialog::SaveDlss5Settings() {
+    QJsonObject j;
+    j["Enabled"] = dlss5CheckBox->isChecked();
+    j["Boost"] = dlss5BoostCheckBox->isChecked();
+    j["NetworkResolutionPercent"] = dlss5ResolutionComboBox->currentData().toInt();
+    j["Passes"] = dlss5PassesComboBox->currentData().toInt();
+    j["Profile"] = dlss5ProfileComboBox->currentData().toInt();
+    j["Intensity"] = dlss5IntensitySlider->value() * 0.01;
+    j["LocalTone"] = dlss5LocalToneSlider->value() * 0.01;
+    j["LocalStructure"] = dlss5LocalStructureSlider->value() * 0.01;
+    j["SkinStructure"] = dlss5SkinStructureSlider->value() * 0.01;
+
+    const std::filesystem::path dir = Common::FS::GetUserPath(Common::FS::PathType::UserDir);
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    const std::filesystem::path path = dir / "neural_screen.json";
+    QFile file(QString::fromStdString(path.string()));
+    if (!file.open(QIODevice::WriteOnly)) {
+        LOG_ERROR(Config, "Could not write {}", path.string());
+        return;
+    }
+    file.write(QJsonDocument(j).toJson(QJsonDocument::Indented));
 }
 
 void SettingsDialog::SyncImageQualityComboBoxes() {

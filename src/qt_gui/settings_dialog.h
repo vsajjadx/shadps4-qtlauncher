@@ -80,6 +80,21 @@ private:
     QSlider* contrastSlider{};
     QGroupBox* imageQualityGroupBox{};
 
+    // DLSS5 (NeuralScreen) group; options are stored in the emulator's
+    // user/neural_screen.json so they survive emulator updates.
+    QGroupBox* dlss5GroupBox{};
+    QCheckBox* dlss5CheckBox{};
+    QCheckBox* dlss5BoostCheckBox{};
+    QComboBox* dlss5ResolutionComboBox{};
+    QComboBox* dlss5PassesComboBox{};
+    QComboBox* dlss5ProfileComboBox{};
+    QSlider* dlss5IntensitySlider{};
+    QSlider* dlss5LocalToneSlider{};
+    QSlider* dlss5LocalStructureSlider{};
+    QSlider* dlss5SkinStructureSlider{};
+    void LoadDlss5Settings();
+    void SaveDlss5Settings();
+
     std::unique_ptr<Ui::SettingsDialog> ui;
     std::shared_ptr<gui_settings> m_gui_settings;
     std::shared_ptr<IpcClient> m_ipc_client;
