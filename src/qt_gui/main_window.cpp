@@ -874,6 +874,13 @@ void MainWindow::CreateConnects() {
     // Package install.
     connect(ui->bootGameAct, &QAction::triggered, this, &MainWindow::BootGame);
 
+    // File > Install Packages (PKG), following shadPS4 v0.4.0.
+    auto* installPkgAct =
+        new QAction(QIcon(":images/folder_icon.png"), tr("Install Packages (PKG)"), this);
+    installPkgAct->setObjectName("installPkgAct");
+    ui->menuFile->insertAction(ui->bootGameAct, installPkgAct);
+    connect(installPkgAct, &QAction::triggered, this, &MainWindow::InstallPkg);
+
     auto* scanGamesAct = new QAction(tr("Scan for PS4 games"), this);
     scanGamesAct->setObjectName("scanGamesAct");
     ui->menuFile->insertAction(ui->bootGameAct, scanGamesAct);
