@@ -88,6 +88,7 @@ private:
     QComboBox* dlss5ResolutionComboBox{};
     QComboBox* dlss5PassesComboBox{};
     QComboBox* dlss5ProfileComboBox{};
+    QComboBox* dlss5ModelComboBox{};
     QSlider* dlss5IntensitySlider{};
     QSlider* dlss5LocalToneSlider{};
     QSlider* dlss5LocalStructureSlider{};

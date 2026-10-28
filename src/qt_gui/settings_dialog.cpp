@@ -1768,8 +1768,8 @@ void SettingsDialog::SetupGraphicsExtras() {
     }
     addDlss5Row(profileLabel, dlss5ProfileComboBox);
 
-    const auto addDlss5SliderRow = [this, dlss5Layout](const QString& label, QSlider*& slider,
-                                                      int min, int max, int initial) {
+    const auto addDlss5SliderRow = [this](QVBoxLayout* target, const QString& label,
+                                          QSlider*& slider, int min, int max, int initial) {
         auto* row = new QHBoxLayout();
         row->addWidget(new QLabel(label, dlss5GroupBox), 0);
         slider = new QSlider(Qt::Horizontal, dlss5GroupBox);
@@ -1783,14 +1783,32 @@ void SettingsDialog::SetupGraphicsExtras() {
         valueLabel->setText(QString::number(initial * 0.01, 'f', 2));
         row->addWidget(slider, 1);
         row->addWidget(valueLabel);
-        dlss5Layout->addLayout(row);
+        target->addLayout(row);
     };
-    addDlss5SliderRow(tr("DLSS5 Intensity:"), dlss5IntensitySlider, 0, 100, 100);
-    addDlss5SliderRow(tr("DLSS5 Fine Tune: Local Tone:"), dlss5LocalToneSlider, 0, 200, 50);
-    addDlss5SliderRow(tr("DLSS5 Fine Tune: Local Structure:"), dlss5LocalStructureSlider, 0, 200,
-                      100);
-    addDlss5SliderRow(tr("DLSS5 Fine Tune: Skin Structure:"), dlss5SkinStructureSlider, -100, 250,
-                      -100);
+    addDlss5SliderRow(dlss5Layout, tr("DLSS5 Intensity:"), dlss5IntensitySlider, 0, 100, 100);
+
+    // Fine tuning: which network runs (Model) and the three strengths.
+    auto* fineTuneBox = new QGroupBox(tr("DLSS5 Fine Tuning"), dlss5GroupBox);
+    fineTuneBox->setObjectName("dlss5FineTuneGroupBox");
+    auto* fineTuneLayout = new QVBoxLayout(fineTuneBox);
+
+    auto* modelRow = new QHBoxLayout();
+    modelRow->addWidget(new QLabel(tr("Model:"), fineTuneBox), 0);
+    dlss5ModelComboBox = new QComboBox(fineTuneBox);
+    dlss5ModelComboBox->setObjectName("dlss5ModelComboBox");
+    const QString models[] = {tr("Default"), tr("Natural"), tr("Cinematic")};
+    for (int index = 0; index < 3; ++index) {
+        dlss5ModelComboBox->addItem(models[index], index);
+    }
+    modelRow->addWidget(dlss5ModelComboBox, 1);
+    fineTuneLayout->addLayout(modelRow);
+
+    addDlss5SliderRow(fineTuneLayout, tr("Local Tone:"), dlss5LocalToneSlider, 0, 200, 150);
+    addDlss5SliderRow(fineTuneLayout, tr("Local Structure:"), dlss5LocalStructureSlider, 0, 200,
+                      150);
+    addDlss5SliderRow(fineTuneLayout, tr("Skin Structure:"), dlss5SkinStructureSlider, -100, 250,
+                      150);
+    dlss5Layout->addWidget(fineTuneBox);
 
     ui->graphicsTabLayoutRight->insertWidget(
         ui->graphicsTabLayoutRight->indexOf(imageQualityGroupBox) + 1, dlss5GroupBox);
@@ -1820,10 +1838,11 @@ void SettingsDialog::LoadDlss5Settings() {
                qBound(30, j.value("NetworkResolutionPercent").toInt(65), 100));
     selectData(dlss5PassesComboBox, qBound(1, j.value("Passes").toInt(1), 4));
     selectData(dlss5ProfileComboBox, qBound(0, j.value("Profile").toInt(1), 3));
+    selectData(dlss5ModelComboBox, qBound(0, j.value("Model").toInt(1), 2));
     setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
-    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(0.5), 0.0, 2.0);
-    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(-1.0), -1.0, 2.5);
+    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(1.5), 0.0, 2.0);
+    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.5), 0.0, 2.0);
+    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(1.5), -1.0, 2.5);
 }
 
 void SettingsDialog::SaveDlss5Settings() {
@@ -1833,6 +1852,7 @@ void SettingsDialog::SaveDlss5Settings() {
     j["NetworkResolutionPercent"] = dlss5ResolutionComboBox->currentData().toInt();
     j["Passes"] = dlss5PassesComboBox->currentData().toInt();
     j["Profile"] = dlss5ProfileComboBox->currentData().toInt();
+    j["Model"] = dlss5ModelComboBox->currentData().toInt();
     j["Intensity"] = dlss5IntensitySlider->value() * 0.01;
     j["LocalTone"] = dlss5LocalToneSlider->value() * 0.01;
     j["LocalStructure"] = dlss5LocalStructureSlider->value() * 0.01;
