@@ -1734,6 +1734,19 @@ void SettingsDialog::SetupGraphicsExtras() {
     dlss5BoostCheckBox->setObjectName("dlss5BoostCheckBox");
     dlss5Layout->addWidget(dlss5BoostCheckBox);
 
+    // Auto Quality (NeuralScreen's "Automatic resolution"): lowers the work
+    // resolution when the rate falls under the target and raises it again
+    // when there is headroom. It only acts while Boost is on.
+    dlss5AutoQualityCheckBox =
+        new QCheckBox(tr("Auto Quality (Automatic Resolution)"), dlss5GroupBox);
+    dlss5AutoQualityCheckBox->setObjectName("dlss5AutoQualityCheckBox");
+    dlss5AutoQualityCheckBox->setToolTip(
+        tr("Lowers the resolution the network runs at when the frame rate drops under the "
+           "target and raises it again when there is headroom. Needs DLSS5 Boost."));
+    dlss5Layout->addWidget(dlss5AutoQualityCheckBox);
+    connect(dlss5BoostCheckBox, &QCheckBox::toggled, dlss5AutoQualityCheckBox,
+            &QWidget::setEnabled);
+
     const auto addDlss5Row = [this, dlss5Layout](QWidget* label, QWidget* control) {
         auto* row = new QHBoxLayout();
         row->addWidget(label, 0);
@@ -1810,8 +1823,8 @@ void SettingsDialog::SetupGraphicsExtras() {
                       150);
     dlss5Layout->addWidget(fineTuneBox);
 
-    ui->graphicsTabLayoutRight->insertWidget(
-        ui->graphicsTabLayoutRight->indexOf(imageQualityGroupBox) + 1, dlss5GroupBox);
+    ui->graphicsTabLayoutLeft->insertWidget(
+        ui->graphicsTabLayoutLeft->indexOf(ui->graphicsAdapterGroupBox) + 1, dlss5GroupBox);
 }
 
 void SettingsDialog::LoadDlss5Settings() {
@@ -1834,6 +1847,8 @@ void SettingsDialog::LoadDlss5Settings() {
 
     dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
     dlss5BoostCheckBox->setChecked(j.value("Boost").toBool(false));
+    dlss5AutoQualityCheckBox->setChecked(j.value("AutoQuality").toBool(false));
+    dlss5AutoQualityCheckBox->setEnabled(dlss5BoostCheckBox->isChecked());
     selectData(dlss5ResolutionComboBox,
                qBound(30, j.value("NetworkResolutionPercent").toInt(65), 100));
     selectData(dlss5PassesComboBox, qBound(1, j.value("Passes").toInt(1), 4));
@@ -1849,6 +1864,7 @@ void SettingsDialog::SaveDlss5Settings() {
     QJsonObject j;
     j["Enabled"] = dlss5CheckBox->isChecked();
     j["Boost"] = dlss5BoostCheckBox->isChecked();
+    j["AutoQuality"] = dlss5AutoQualityCheckBox->isChecked();
     j["NetworkResolutionPercent"] = dlss5ResolutionComboBox->currentData().toInt();
     j["Passes"] = dlss5PassesComboBox->currentData().toInt();
     j["Profile"] = dlss5ProfileComboBox->currentData().toInt();

@@ -85,6 +85,7 @@ private:
     QGroupBox* dlss5GroupBox{};
     QCheckBox* dlss5CheckBox{};
     QCheckBox* dlss5BoostCheckBox{};
+    QCheckBox* dlss5AutoQualityCheckBox{};
     QComboBox* dlss5ResolutionComboBox{};
     QComboBox* dlss5PassesComboBox{};
     QComboBox* dlss5ProfileComboBox{};
