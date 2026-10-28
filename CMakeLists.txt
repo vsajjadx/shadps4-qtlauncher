@@ -202,65 +202,6 @@ list(POP_BACK CMAKE_MODULE_PATH)
 
 add_subdirectory(externals)
 
-# Crypto++ for PKG installation (shadPS4 v0.7.0 used the same setup).
-if (NOT TARGET cryptopp::cryptopp)
-    FetchContent_Declare(cryptopp_src
-        GIT_REPOSITORY https://github.com/weidai11/cryptopp.git
-        GIT_TAG CRYPTOPP_8_9_0
-        GIT_SHALLOW TRUE)
-    FetchContent_MakeAvailable(cryptopp_src)
-    # Crypto++ hard-stops on clang-cl (_MSC_VER together with __clang__) in config_os.h, which
-    # is the compiler this launcher is built with on Windows. Remove that stop before the sources
-    # and the copied headers are used.
-    file(READ ${cryptopp_src_SOURCE_DIR}/config_os.h CRYPTOPP_CONFIG_OS_CONTENT)
-    string(REPLACE "#if (defined(_MSC_VER) && defined(__clang__))"
-                   "#if 0 /* clang-cl allowed by shadPS4 fork build */"
-                   CRYPTOPP_CONFIG_OS_CONTENT "${CRYPTOPP_CONFIG_OS_CONTENT}")
-    file(WRITE ${cryptopp_src_SOURCE_DIR}/config_os.h "${CRYPTOPP_CONFIG_OS_CONTENT}")
-    set(CRYPTOPP_INSTALL OFF)
-    set(CRYPTOPP_BUILD_TESTING OFF)
-    set(CRYPTOPP_SOURCES ${cryptopp_src_SOURCE_DIR})
-    # Instruction set checks do not see the target's compile options.
-    set(CRYPTOPP_DISABLE_AESNI ON)
-    set(CRYPTOPP_DISABLE_AVX2 ON)
-    # The CI has no MASM, so the portable C++ code is used instead of the assembly files.
-    set(CRYPTOPP_DISABLE_ASM ON)
-    FetchContent_Declare(cryptopp_cmake
-        GIT_REPOSITORY https://github.com/abdes/cryptopp-cmake.git
-        GIT_TAG CRYPTOPP_8_9_0
-        GIT_SHALLOW TRUE)
-    FetchContent_MakeAvailable(cryptopp_cmake)
-    # config_asm.h picks the MASM helpers (CPUID64, XGETBV64) for _MSC_VER + x64, which also
-    # matches clang-cl, but the .asm files are not built. Turn the assembly paths off for real.
-    target_compile_definitions(cryptopp PUBLIC CRYPTOPP_DISABLE_ASM)
-    # cpu.cpp still calls CPUID64/XGETBV64 (normally from x64dll.asm) for MSVC-style compilers on
-    # x64, including clang-cl. Provide them in C++ instead of building the MASM file.
-    file(WRITE ${CMAKE_BINARY_DIR}/cryptopp_x64_stubs.cpp [=[
-#include <intrin.h>
-extern "C" unsigned long long CPUID64(unsigned int func, unsigned int subfunc,
-                                      unsigned int* output) {
-    int regs[4];
-    __cpuidex(regs, static_cast<int>(func), static_cast<int>(subfunc));
-    output[0] = static_cast<unsigned int>(regs[0]);
-    output[1] = static_cast<unsigned int>(regs[1]);
-    output[2] = static_cast<unsigned int>(regs[2]);
-    output[3] = static_cast<unsigned int>(regs[3]);
-    return 0;
-}
-extern "C" unsigned long long XGETBV64(unsigned int index) {
-    unsigned int lo = 0;
-    unsigned int hi = 0;
-    __asm__ volatile(".byte 0x0f, 0x01, 0xd0" : "=a"(lo), "=d"(hi) : "c"(index) : "cc");
-    return (static_cast<unsigned long long>(hi) << 32) | lo;
-}
-]=])
-    target_sources(cryptopp PRIVATE ${CMAKE_BINARY_DIR}/cryptopp_x64_stubs.cpp)
-    # Headers are included as <cryptopp/...>; the source folder also has a conflicting zlib.h.
-    file(COPY ${cryptopp_src_SOURCE_DIR}/ DESTINATION ${CMAKE_BINARY_DIR}/cryptopp_include/cryptopp
-         FILES_MATCHING PATTERN "*.h")
-    set_target_properties(cryptopp PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-                          "${CMAKE_BINARY_DIR}/cryptopp_include")
-endif()
 include_directories(src)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent LinguistTools Network Multimedia)
@@ -319,13 +260,6 @@ set(CORE src/core/file_format/elf.cpp
          src/core/file_format/npbind.cpp
          src/core/file_format/npbind.h
          src/core/file_format/psf.cpp
-         src/core/file_format/pfs.h
-         src/core/file_format/pkg.cpp
-         src/core/file_format/pkg.h
-         src/core/file_format/pkg_type.cpp
-         src/core/file_format/pkg_type.h
-         src/core/crypto/crypto.cpp
-         src/core/crypto/crypto.h
          src/core/file_format/psf.h
          src/core/file_format/trp.cpp
          src/core/file_format/trp.h
@@ -361,7 +295,6 @@ if (ENABLE_UPDATER)
 endif()
 
 set(QT_GUI src/qt_gui/about_dialog.cpp
-           src/qt_gui/pkg_install.cpp
            src/qt_gui/about_dialog.h
            src/qt_gui/about_dialog.ui
            src/qt_gui/background_music_player.cpp
@@ -476,7 +409,6 @@ if (NOT APPLE)
     target_link_libraries(shadPS4QtLauncher PRIVATE Vulkan::Headers volk_headers)
 endif()
 
-target_link_libraries(shadPS4QtLauncher PRIVATE cryptopp::cryptopp)
 target_link_libraries(shadPS4QtLauncher PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network Qt6::Multimedia nlohmann_json::nlohmann_json OpenAL::OpenAL)
 if (ENABLE_UPDATER)
     add_definitions(-DENABLE_UPDATER)
