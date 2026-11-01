@@ -1742,10 +1742,22 @@ void SettingsDialog::SetupGraphicsExtras() {
     dlss5AutoQualityCheckBox->setObjectName("dlss5AutoQualityCheckBox");
     dlss5AutoQualityCheckBox->setToolTip(
         tr("Lowers the resolution the network runs at when the frame rate drops under the "
-           "target and raises it again when there is headroom. Needs DLSS5 Boost."));
+           "target and raises it again when there is headroom. Turns DLSS5 Boost on with it."));
     dlss5Layout->addWidget(dlss5AutoQualityCheckBox);
+    // Auto Quality only acts with Boost on: ticking it turns Boost on, and turning Boost off
+    // clears it, so the box is never greyed out.
+    connect(dlss5AutoQualityCheckBox, &QCheckBox::toggled, dlss5BoostCheckBox,
+            [this](bool on) {
+                if (on) {
+                    dlss5BoostCheckBox->setChecked(true);
+                }
+            });
     connect(dlss5BoostCheckBox, &QCheckBox::toggled, dlss5AutoQualityCheckBox,
-            &QWidget::setEnabled);
+            [this](bool on) {
+                if (!on) {
+                    dlss5AutoQualityCheckBox->setChecked(false);
+                }
+            });
 
     const auto addDlss5Row = [this, dlss5Layout](QWidget* label, QWidget* control) {
         auto* row = new QHBoxLayout();
@@ -1847,8 +1859,8 @@ void SettingsDialog::LoadDlss5Settings() {
 
     dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
     dlss5BoostCheckBox->setChecked(j.value("Boost").toBool(false));
-    dlss5AutoQualityCheckBox->setChecked(j.value("AutoQuality").toBool(false));
-    dlss5AutoQualityCheckBox->setEnabled(dlss5BoostCheckBox->isChecked());
+    dlss5AutoQualityCheckBox->setChecked(j.value("AutoQuality").toBool(false) &&
+                                         dlss5BoostCheckBox->isChecked());
     selectData(dlss5ResolutionComboBox,
                qBound(30, j.value("NetworkResolutionPercent").toInt(65), 100));
     selectData(dlss5PassesComboBox, qBound(1, j.value("Passes").toInt(1), 4));
