@@ -4,13 +4,16 @@
 // PKG installation, brought back from shadPS4 v0.7.0. Fake PKGs made with the default passcode
 // need no keys; others use the keysets from Manage Cryptographic Keys.
 
+#include <algorithm>
 #include <numeric>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFileDialog>
 #include <QFutureWatcher>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QTimer>
 #include <QtConcurrent>
 
 #include <QCoreApplication>
@@ -268,25 +271,88 @@ void MainWindow::InstallPkgFile(const std::filesystem::path& file,
         QVector<int> indices(file_count);
         std::iota(indices.begin(), indices.end(), 0);
 
+        const u64 total_bytes = pkg.GetTotalExtractSize();
+        constexpr int ProgressSteps = 10000; // 0.01% resolution
+
+        const auto format_size = [](u64 bytes) {
+            const double value = static_cast<double>(bytes);
+            if (bytes >= (1ULL << 30)) {
+                return QString::number(value / (1ULL << 30), 'f', 2) + QStringLiteral(" GB");
+            }
+            if (bytes >= (1ULL << 20)) {
+                return QString::number(value / (1ULL << 20), 'f', 1) + QStringLiteral(" MB");
+            }
+            return QString::number(value / 1024.0, 'f', 0) + QStringLiteral(" KB");
+        };
+        const auto format_time = [](qint64 seconds) {
+            return QStringLiteral("%1:%2:%3")
+                .arg(seconds / 3600)
+                .arg((seconds / 60) % 60, 2, 10, QChar('0'))
+                .arg(seconds % 60, 2, 10, QChar('0'));
+        };
+
         QProgressDialog dialog(this);
         dialog.setWindowTitle(tr("PKG Extraction"));
         dialog.setWindowModality(Qt::WindowModal);
+        dialog.setMinimumDuration(0);
+        dialog.setMinimumWidth(460);
         dialog.setLabelText(tr("Extracting PKG %1/%2").arg(pkg_num).arg(pkg_count));
-        dialog.setRange(0, file_count);
-        dialog.setAutoClose(true);
+        dialog.setRange(0, total_bytes > 0 ? ProgressSteps : file_count);
+        dialog.setAutoClose(false);
+        dialog.setAutoReset(false);
 
         QFutureWatcher<void> watcher;
         QEventLoop loop;
+        QElapsedTimer clock;
+        u64 last_bytes = 0;
+        qint64 last_ms = 0;
+        double speed = 0.0; // smoothed bytes per second
+
+        const auto refresh = [&] {
+            const u64 written = std::min(pkg.GetBytesWritten(), total_bytes);
+            const qint64 now_ms = clock.elapsed();
+            if (now_ms - last_ms >= 250) {
+                const double instant =
+                    static_cast<double>(written - last_bytes) * 1000.0 / (now_ms - last_ms);
+                speed = speed <= 0.0 ? instant : speed * 0.7 + instant * 0.3;
+                last_bytes = written;
+                last_ms = now_ms;
+            }
+            const double percent =
+                total_bytes > 0 ? 100.0 * static_cast<double>(written) / total_bytes : 0.0;
+            QString text = tr("Extracting PKG %1/%2").arg(pkg_num).arg(pkg_count);
+            text += QStringLiteral("\n%1%  -  %2 / %3 written")
+                        .arg(percent, 0, 'f', 2)
+                        .arg(format_size(written), format_size(total_bytes));
+            if (speed > 1.0 && now_ms > 1000) {
+                const qint64 left = static_cast<qint64>(
+                    static_cast<double>(total_bytes - written) / speed + 0.5);
+                text += tr("\nSpeed: %1/s  -  Time left: %2")
+                            .arg(format_size(static_cast<u64>(speed)), format_time(left));
+            } else {
+                text += tr("\nSpeed: calculating...  -  Time left: calculating...");
+            }
+            dialog.setLabelText(text);
+            dialog.setValue(total_bytes > 0
+                                ? static_cast<int>(percent * ProgressSteps / 100.0)
+                                : static_cast<int>(watcher.progressValue()));
+        };
+
+        QTimer ticker;
+        ticker.setInterval(250);
+        connect(&ticker, &QTimer::timeout, &dialog, refresh);
         connect(&dialog, &QProgressDialog::canceled, &watcher, &QFutureWatcher<void>::cancel);
-        connect(&watcher, &QFutureWatcher<void>::progressValueChanged, &dialog,
-                &QProgressDialog::setValue);
         connect(&watcher, &QFutureWatcher<void>::finished, &loop, &QEventLoop::quit);
+        clock.start();
         watcher.setFuture(
             QtConcurrent::map(indices, [&pkg](int index) { pkg.ExtractFiles(index); }));
+        ticker.start();
+        refresh();
         dialog.show();
         if (!watcher.isFinished()) {
             loop.exec();
         }
+        ticker.stop();
         watcher.waitForFinished();
         dialog.close();
         if (watcher.isCanceled()) {

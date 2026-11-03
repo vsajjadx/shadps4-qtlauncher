@@ -4,6 +4,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -104,6 +105,13 @@ public:
 
     bool Open(const std::filesystem::path& filepath, std::string& failreason);
     void ExtractFiles(const int index);
+
+    // Bytes of file data the extraction will write in total, and how many it has written so far
+    // (updated by every extraction thread).
+    u64 GetTotalExtractSize() const;
+    u64 GetBytesWritten() const {
+        return bytes_written.load(std::memory_order_relaxed);
+    }
     bool Extract(const std::filesystem::path& filepath, const std::filesystem::path& extract,
                  std::string& failreason);
 
@@ -157,6 +165,7 @@ private:
     PKGHeader pkgheader;
     std::string pkgFlags;
 
+    std::atomic<u64> bytes_written{0};
     std::unordered_map<int, std::filesystem::path> extractPaths;
     std::vector<pfs_fs_table> fsTable;
     std::vector<Inode> iNodeBuf;

@@ -422,6 +422,16 @@ bool PKG::Extract(const std::filesystem::path& filepath, const std::filesystem::
     return true;
 }
 
+u64 PKG::GetTotalExtractSize() const {
+    u64 total = 0;
+    for (const auto& entry : fsTable) {
+        if (entry.type == PFS_FILE) {
+            total += static_cast<u64>(iNodeBuf[entry.inode].Size);
+        }
+    }
+    return total;
+}
+
 void PKG::ExtractFiles(const int index) {
     int inode_number = fsTable[index].inode;
     int inode_type = fsTable[index].type;
@@ -475,10 +485,12 @@ void PKG::ExtractFiles(const int index) {
 
             if (j < nblocks - 1) {
                 inflated.WriteRaw<u8>(decompressedData.data(), decompressedData.size());
+                bytes_written.fetch_add(decompressedData.size(), std::memory_order_relaxed);
             } else {
                 // This is to remove the zeros at the end of the file.
                 const u32 write_size = decompressedData.size() - (size_decompressed - bsize);
                 inflated.WriteRaw<u8>(decompressedData.data(), write_size);
+                bytes_written.fetch_add(write_size, std::memory_order_relaxed);
             }
         }
         pkgFile.Close();
