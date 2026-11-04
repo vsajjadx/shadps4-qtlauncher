@@ -9,6 +9,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QSaveFile>
 #include <QString>
@@ -46,6 +47,41 @@ struct GameInfo {
 class GameListUtils : public QObject {
     Q_OBJECT
 public:
+    static std::filesystem::path CachePackageAsset(const std::filesystem::path& pkg_path,
+                                                   const QString& file_name,
+                                                   const std::vector<u8>& data) {
+        if (data.empty()) {
+            return {};
+        }
+        QString source_path;
+        Common::FS::PathToQString(source_path, pkg_path);
+        const QFileInfo source_info(source_path);
+        const QString cache_seed = source_path + QLatin1Char('|') +
+                                   QString::number(source_info.size()) + QLatin1Char('|') +
+                                   QString::number(source_info.lastModified().toMSecsSinceEpoch());
+        const QString cache_key = QString::fromLatin1(
+            QCryptographicHash::hash(cache_seed.toUtf8(), QCryptographicHash::Sha256).toHex());
+        const QDir cache_dir(Common::FS::GetUserPath(Common::FS::PathType::LauncherMetaData) /
+                             "pkg_assets" / cache_key.toStdString());
+        if (!cache_dir.exists() && !cache_dir.mkpath(".")) {
+            return {};
+        }
+        const QString asset_path = cache_dir.filePath(file_name);
+        const qint64 expected_size = static_cast<qint64>(data.size());
+        const QFileInfo cached_asset(asset_path);
+        if (cached_asset.exists() && cached_asset.size() == expected_size) {
+            return Common::FS::PathFromQString(asset_path);
+        }
+        QSaveFile asset_file(asset_path);
+        if (!asset_file.open(QIODevice::WriteOnly) ||
+            asset_file.write(reinterpret_cast<const char*>(data.data()), expected_size) !=
+                expected_size ||
+            !asset_file.commit()) {
+            return {};
+        }
+        return Common::FS::PathFromQString(asset_path);
+    }
+
     static QString FormatSize(u64 size) {
         static const QStringList suffixes = {tr("B"), tr("KB"), tr("MB"), tr("GB"), tr("TB")};
         int suffixIndex = 0;

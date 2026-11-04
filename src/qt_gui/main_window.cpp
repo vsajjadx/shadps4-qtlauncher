@@ -1045,17 +1045,25 @@ void MainWindow::StartGameWithArgs(QStringList args) {
     int table_mode = m_gui_settings->GetValue(gui::gl_mode).toInt();
 
     int itemID;
+    const auto gameExecutablePath = [this](int gameId) {
+        const auto& path = m_game_info->m_games[gameId].path;
+        QString extension;
+        Common::FS::PathToQString(extension, path.extension());
+        return extension.compare(QStringLiteral(".pkg"), Qt::CaseInsensitive) == 0
+                   ? path
+                   : path / "eboot.bin";
+    };
     if (table_mode == 0) {
         if (m_game_list_frame->currentItem()) {
             itemID = m_game_list_frame->currentItem()->row();
-            Common::FS::PathToQString(gamePath, m_game_info->m_games[itemID].path / "eboot.bin");
+            Common::FS::PathToQString(gamePath, gameExecutablePath(itemID));
             runningGameSerial = m_game_info->m_games[itemID].serial;
         }
     } else if (table_mode == 1) {
         if (m_game_grid_frame->cellClicked) {
             itemID = (m_game_grid_frame->crtRow * m_game_grid_frame->columnCnt) +
                      m_game_grid_frame->crtColumn;
-            Common::FS::PathToQString(gamePath, m_game_info->m_games[itemID].path / "eboot.bin");
+            Common::FS::PathToQString(gamePath, gameExecutablePath(itemID));
             runningGameSerial = m_game_info->m_games[itemID].serial;
         }
     } else {

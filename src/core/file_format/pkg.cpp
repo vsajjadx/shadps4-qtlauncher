@@ -40,6 +40,11 @@ PKG::PKG() = default;
 PKG::~PKG() = default;
 
 bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
+    sfo.clear();
+    icon0_png.clear();
+    pic1_png.clear();
+    snd0_at9.clear();
+    pkgFlags.clear();
     Common::FS::IOFile file(filepath, Common::FS::FileAccessMode::Read);
     if (!file.IsOpen()) {
         return false;
@@ -82,15 +87,29 @@ bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
 
         // Try to figure out the name
         const auto name = GetEntryNameByType(entry.id);
+        std::vector<u8>* destination = nullptr;
         if (name == "param.sfo") {
-            sfo.clear();
-            if (!file.Seek(entry.offset)) {
-                failreason = "Failed to seek to param.sfo offset";
-                return false;
-            }
-            sfo.resize(entry.size);
-            file.ReadRaw<u8>(sfo.data(), entry.size);
+            destination = &sfo;
+        } else if (name == "icon0.png") {
+            destination = &icon0_png;
+        } else if (name == "pic1.png") {
+            destination = &pic1_png;
+        } else if (name == "snd0.at9") {
+            destination = &snd0_at9;
         }
+        if (destination == nullptr) {
+            continue;
+        }
+        // These assets are only used for the launcher UI, so skip abnormally large optional files.
+        if (name != "param.sfo" && entry.size > 64u * 1024u * 1024u) {
+            continue;
+        }
+        if (!file.Seek(entry.offset)) {
+            failreason = "Failed to seek to PKG metadata offset";
+            return false;
+        }
+        destination->resize(entry.size);
+        file.ReadRaw<u8>(destination->data(), entry.size);
     }
     file.Close();
 

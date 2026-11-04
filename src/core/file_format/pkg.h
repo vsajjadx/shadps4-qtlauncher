@@ -116,6 +116,9 @@ public:
                  std::string& failreason);
 
     std::vector<u8> sfo;
+    std::vector<u8> icon0_png;
+    std::vector<u8> pic1_png;
+    std::vector<u8> snd0_at9;
 
     u32 GetNumberOfFiles() {
         return fsTable.size();

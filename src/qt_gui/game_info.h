@@ -64,6 +64,17 @@ public:
                 return game;
             }
 
+            if (!pkg.icon0_png.empty()) {
+                game.icon = QImage::fromData(reinterpret_cast<const uchar*>(pkg.icon0_png.data()),
+                                             static_cast<qsizetype>(pkg.icon0_png.size()));
+                game.icon_path = GameListUtils::CachePackageAsset(
+                    filePath, QStringLiteral("icon0.png"), pkg.icon0_png);
+            }
+            game.pic_path = GameListUtils::CachePackageAsset(
+                filePath, QStringLiteral("pic1.png"), pkg.pic1_png);
+            game.snd0_path = GameListUtils::CachePackageAsset(
+                filePath, QStringLiteral("snd0.at9"), pkg.snd0_at9);
+
             if (const auto localized_title =
                     psf.GetString(fmt::format("TITLE_{:02}", EmulatorSettings.GetConsoleLanguage()));
                 localized_title.has_value()) {
