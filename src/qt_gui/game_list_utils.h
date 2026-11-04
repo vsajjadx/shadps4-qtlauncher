@@ -124,7 +124,18 @@ public:
 
     static StorageEntry MeasureStorageEntry(const std::filesystem::path& root) {
         const bool is_archive = Core::FileSys::IsZArchiveFile(root);
-        const u64 stored_size = Core::FileSys::GetGameRootSize(root);
+        std::error_code size_error;
+        const bool is_regular_file = std::filesystem::is_regular_file(root, size_error) && !size_error;
+        u64 stored_size = 0;
+        if (is_regular_file && !is_archive) {
+            size_error.clear();
+            const auto size = std::filesystem::file_size(root, size_error);
+            if (!size_error) {
+                stored_size = static_cast<u64>(size);
+            }
+        } else {
+            stored_size = Core::FileSys::GetGameRootSize(root);
+        }
         const u64 content_size =
             is_archive ? Core::FileSys::GetGameRootContentSize(root) : stored_size;
         QString name;

@@ -8,6 +8,7 @@
 #include <QtConcurrent>
 
 #include "core/file_format/psf.h"
+#include "core/file_format/pkg.h"
 #include "core/file_sys/game_backend.h"
 #include "game_list_utils.h"
 #include "gui_settings.h"
@@ -50,6 +51,61 @@ public:
     static GameInfo readGameInfo(const std::filesystem::path& filePath) {
         GameInfo game;
         game.path = filePath;
+        const QString extension = QString::fromStdString(filePath.extension().string());
+        if (extension.compare(QStringLiteral(".pkg"), Qt::CaseInsensitive) == 0) {
+            PKG pkg;
+            std::string failreason;
+            PSF psf;
+            if (!pkg.Open(filePath, failreason) || !psf.Open(pkg.sfo)) {
+                return game;
+            }
+            const auto category = psf.GetString("CATEGORY");
+            if (!category.has_value() || *category != "gd") {
+                return game;
+            }
+
+            if (const auto localized_title =
+                    psf.GetString(fmt::format("TITLE_{:02}", EmulatorSettings.GetConsoleLanguage()));
+                localized_title.has_value()) {
+                game.name = *localized_title;
+            } else if (const auto title = psf.GetString("TITLE"); title.has_value()) {
+                game.name = *title;
+            }
+            if (const auto title_id = psf.GetString("TITLE_ID"); title_id.has_value()) {
+                game.serial = *title_id;
+            }
+            if (const auto content_id = psf.GetString("CONTENT_ID");
+                content_id.has_value() && !content_id->empty()) {
+                game.region = GameListUtils::GetRegion(content_id->at(0)).toStdString();
+            }
+            if (const auto fw_int_opt = psf.GetInteger("SYSTEM_VER"); fw_int_opt.has_value()) {
+                const u32 fw_int = *fw_int_opt;
+                if (fw_int == 0) {
+                    game.fw = "0.00";
+                } else {
+                    const u8 major_bcd = (fw_int >> 24) & 0xFF;
+                    const u8 minor_bcd = (fw_int >> 16) & 0xFF;
+                    const int major = ((major_bcd >> 4) * 10) + (major_bcd & 0xF);
+                    const int minor = ((minor_bcd >> 4) * 10) + (minor_bcd & 0xF);
+                    game.fw = QString("%1.%2")
+                                  .arg(major)
+                                  .arg(minor, 2, 10, QChar('0'))
+                                  .toStdString();
+                }
+            }
+            if (const auto app_ver = psf.GetString("APP_VER"); app_ver.has_value()) {
+                game.version = *app_ver;
+            }
+            if (const auto play_time = psf.GetString("PLAY_TIME"); play_time.has_value()) {
+                game.play_time = *play_time;
+            }
+            if (const auto save_dir = psf.GetString("INSTALL_DIR_SAVEDATA"); save_dir.has_value()) {
+                game.save_dir = *save_dir;
+            } else {
+                game.save_dir = game.serial;
+            }
+            return game;
+        }
         std::filesystem::path param_sfo_path;
         const std::filesystem::path stem_path = Core::FileSys::StripZArchiveExtension(filePath);
         std::filesystem::path game_update_path = stem_path;

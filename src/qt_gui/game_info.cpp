@@ -13,6 +13,7 @@
 #include "common/path_util.h"
 #include "compatibility_info.h"
 #include "core/emulator_settings.h"
+#include "core/file_format/pkg.h"
 #include "core/file_sys/game_backend.h"
 #include "game_info.h"
 
@@ -113,6 +114,17 @@ void ScanDirectoryRecursively(const QString& dir, QStringList& filePaths,
             continue;
         }
         filePaths.append(archive.absoluteFilePath());
+    }
+
+    const QFileInfoList packages = directory.entryInfoList(
+        QStringList{"*.pkg", "*.PKG"}, QDir::Files | QDir::NoDotAndDotDot);
+    for (const auto& package : packages) {
+        const QString stem = package.completeBaseName();
+        if (stem.endsWith("-UPDATE", Qt::CaseInsensitive) ||
+            stem.endsWith("-patch", Qt::CaseInsensitive)) {
+            continue;
+        }
+        filePaths.append(package.absoluteFilePath());
     }
 }
 
