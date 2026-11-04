@@ -300,11 +300,8 @@ static QString friendlyVersionName(const std::string& rawName) {
 
 void SteamShortcut::requestAddToSteam(const GameInfo& selectedInfo, QString emuPath) {
     QString targetPath;
-    Common::FS::PathToQString(targetPath, selectedInfo.path);
-    QString ebootPath = targetPath + "/eboot.bin";
-    if (Core::FileSys::IsZArchiveFile(selectedInfo.path)) {
-        ebootPath = targetPath;
-    }
+    Common::FS::PathToQString(targetPath, GameListUtils::GetLaunchPath(selectedInfo));
+    const QString ebootPath = targetPath;
 
     QString exePath = QCoreApplication::applicationFilePath();
 #ifdef Q_OS_WIN

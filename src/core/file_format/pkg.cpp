@@ -39,7 +39,8 @@ PKG::PKG() = default;
 
 PKG::~PKG() = default;
 
-bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
+bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason,
+               const bool load_ui_assets) {
     sfo.clear();
     icon0_png.clear();
     pic1_png.clear();
@@ -93,11 +94,11 @@ bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
         std::vector<u8>* destination = nullptr;
         if (name == "param.sfo") {
             destination = &sfo;
-        } else if (name == "icon0.png") {
+        } else if (load_ui_assets && name == "icon0.png") {
             destination = &icon0_png;
-        } else if (name == "pic1.png") {
+        } else if (load_ui_assets && name == "pic1.png") {
             destination = &pic1_png;
-        } else if (name == "snd0.at9") {
+        } else if (load_ui_assets && name == "snd0.at9") {
             destination = &snd0_at9;
         }
         if (destination == nullptr) {

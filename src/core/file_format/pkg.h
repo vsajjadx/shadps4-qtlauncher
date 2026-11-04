@@ -103,7 +103,8 @@ public:
     PKG();
     ~PKG();
 
-    bool Open(const std::filesystem::path& filepath, std::string& failreason);
+    bool Open(const std::filesystem::path& filepath, std::string& failreason,
+              bool load_ui_assets = true);
     void ExtractFiles(const int index);
 
     // Bytes of file data the extraction will write in total, and how many it has written so far

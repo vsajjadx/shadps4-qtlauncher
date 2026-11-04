@@ -4,6 +4,7 @@
 #pragma once
 
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 
 #include <QCryptographicHash>
@@ -25,9 +26,11 @@ struct GameInfo {
     std::filesystem::path path; // root path of game directory
                                 // (normally directory that contains eboot.bin)
     std::filesystem::path update_path;
+    std::filesystem::path package_update_path;
     std::filesystem::path icon_path; // path of icon0.png
     std::filesystem::path pic_path;  // path of pic1.png
     std::filesystem::path snd0_path; // path of snd0.at9
+    std::vector<std::filesystem::path> package_dlc_paths;
     QImage icon;
     std::string size;
     u64 stored_size{};
@@ -47,6 +50,18 @@ struct GameInfo {
 class GameListUtils : public QObject {
     Q_OBJECT
 public:
+    static bool IsPackagePath(const std::filesystem::path& path) {
+        return QString::fromStdString(path.extension().string())
+            .compare(QStringLiteral(".pkg"), Qt::CaseInsensitive) == 0;
+    }
+
+    static std::filesystem::path GetLaunchPath(const GameInfo& game) {
+        if (IsPackagePath(game.path) || Core::FileSys::IsZArchiveFile(game.path)) {
+            return game.path;
+        }
+        return game.path / "eboot.bin";
+    }
+
     static std::filesystem::path CachePackageAsset(const std::filesystem::path& pkg_path,
                                                    const QString& file_name,
                                                    const std::vector<u8>& data) {
@@ -118,6 +133,14 @@ public:
 
     static std::vector<std::filesystem::path> GetGameRoots(const GameInfo& game) {
         std::vector<std::filesystem::path> roots{game.path};
+        if (IsPackagePath(game.path)) {
+            if (!game.package_update_path.empty()) {
+                roots.push_back(game.package_update_path);
+            }
+            roots.insert(roots.end(), game.package_dlc_paths.begin(),
+                         game.package_dlc_paths.end());
+            return roots;
+        }
         const auto stem_path = Core::FileSys::StripZArchiveExtension(game.path);
         for (const auto& suffix : {"-UPDATE", "-patch"}) {
             std::filesystem::path overlay = stem_path;
@@ -200,7 +223,9 @@ public:
 
         // Keep the first line readable by older launchers. Older cache formats lack a complete
         // breakdown, so migrate them by calculating once; complete caches need no size scan.
-        if (!force_recalculate && read_cache_file->open(QIODevice::ReadOnly | QIODevice::Text)) {
+        const bool is_package_game = IsPackagePath(game.path);
+        if (!force_recalculate && !is_package_game &&
+            read_cache_file->open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(read_cache_file);
             in.readLine();
             const QString version = in.readLine();
@@ -252,7 +277,7 @@ public:
             entries.push_back(MeasureStorageEntry(root));
             // Only the selected update contributes to the Size column. Keep every installed
             // update in the tooltip, including alternative folder/archive variants.
-            if (index == 0 || root == game.update_path) {
+            if (is_package_game || index == 0 || root == game.update_path) {
                 const auto& entry_storage = entries.back().storage;
                 storage.stored_size += entry_storage.stored_size;
                 storage.content_size += entry_storage.content_size;
@@ -274,7 +299,13 @@ public:
         }
         std::ranges::sort(dlc_roots);
         for (const auto& root : dlc_roots) {
-            entries.push_back(MeasureStorageEntry(root));
+            const auto entry = MeasureStorageEntry(root);
+            entries.push_back(entry);
+            if (is_package_game) {
+                storage.stored_size += entry.storage.stored_size;
+                storage.content_size += entry.storage.content_size;
+                storage.contains_archive |= entry.storage.contains_archive;
+            }
         }
         game.stored_size = storage.stored_size;
         game.size = FormatSize(storage.stored_size).toStdString();

@@ -116,9 +116,12 @@ void ScanDirectoryRecursively(const QString& dir, QStringList& filePaths,
         filePaths.append(archive.absoluteFilePath());
     }
 
-    const QFileInfoList packages = directory.entryInfoList(
-        QStringList{"*.pkg", "*.PKG"}, QDir::Files | QDir::NoDotAndDotDot);
+    const QFileInfoList packages =
+        directory.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const auto& package : packages) {
+        if (!GameListUtils::IsPackagePath(Common::FS::PathFromQString(package.absoluteFilePath()))) {
+            continue;
+        }
         const QString stem = package.completeBaseName();
         if (stem.endsWith("-UPDATE", Qt::CaseInsensitive) ||
             stem.endsWith("-patch", Qt::CaseInsensitive)) {

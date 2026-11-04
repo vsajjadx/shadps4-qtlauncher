@@ -4,6 +4,16 @@
 #pragma once
 #include <core/emulator_settings.h>
 
+#include <algorithm>
+#include <charconv>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <system_error>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include <QFutureWatcher>
 #include <QtConcurrent>
 
@@ -16,6 +26,12 @@
 class GameInfoClass : public QObject {
     Q_OBJECT
 public:
+    struct PackageMetadata {
+        std::string title_id;
+        std::string category;
+        std::string version;
+    };
+
     GameInfoClass();
     ~GameInfoClass();
     void GetGameInfo(QWidget* parent = nullptr, bool force_size_refresh = false,
@@ -48,6 +64,134 @@ public:
         return name_a < name_b;
     }
 
+    static std::optional<PackageMetadata> GetPackageMetadata(const PSF& psf) {
+        const auto category = psf.GetString("CATEGORY");
+        if (!category.has_value() || category->empty()) {
+            return std::nullopt;
+        }
+
+        std::string title_id{psf.GetString("TITLE_ID").value_or("")};
+        if (const auto content_id = psf.GetString("CONTENT_ID");
+            content_id.has_value() && content_id->size() >= 16) {
+            const std::string content_title_id{content_id->substr(7, 9)};
+            if (!title_id.empty() && title_id != content_title_id) {
+                return std::nullopt;
+            }
+            if (title_id.empty()) {
+                title_id = content_title_id;
+            }
+        }
+        if (title_id.empty()) {
+            return std::nullopt;
+        }
+
+        return PackageMetadata{std::move(title_id), std::string{*category},
+                               std::string{psf.GetString("APP_VER").value_or("")}};
+    }
+
+    static std::optional<PackageMetadata> ReadPackageMetadata(
+        const std::filesystem::path& file_path) {
+        PKG pkg;
+        std::string failreason;
+        PSF psf;
+        if (!pkg.Open(file_path, failreason, false) || pkg.sfo.empty() || !psf.Open(pkg.sfo)) {
+            return std::nullopt;
+        }
+        return GetPackageMetadata(psf);
+    }
+
+    static std::optional<std::vector<std::uint64_t>> ParsePackageVersion(
+        std::string_view version) {
+        if (version.empty()) {
+            return std::nullopt;
+        }
+        std::vector<std::uint64_t> components;
+        size_t start = 0;
+        while (start < version.size()) {
+            const size_t end = version.find('.', start);
+            const auto component = version.substr(
+                start, end == std::string_view::npos ? version.size() - start : end - start);
+            if (component.empty()) {
+                return std::nullopt;
+            }
+            std::uint64_t value{};
+            const auto [parsed_end, error] =
+                std::from_chars(component.data(), component.data() + component.size(), value);
+            if (error != std::errc{} || parsed_end != component.data() + component.size()) {
+                return std::nullopt;
+            }
+            components.push_back(value);
+            if (end == std::string_view::npos) {
+                break;
+            }
+            start = end + 1;
+        }
+        if (version.back() == '.') {
+            return std::nullopt;
+        }
+        return components;
+    }
+
+    static bool IsPackageVersionNewer(std::string_view candidate, std::string_view current) {
+        const auto candidate_parts = ParsePackageVersion(candidate);
+        const auto current_parts = ParsePackageVersion(current);
+        if (!candidate_parts || !current_parts) {
+            return false;
+        }
+        const size_t count = std::max(candidate_parts->size(), current_parts->size());
+        for (size_t i = 0; i < count; ++i) {
+            const auto candidate_part =
+                i < candidate_parts->size() ? (*candidate_parts)[i] : std::uint64_t{};
+            const auto current_part =
+                i < current_parts->size() ? (*current_parts)[i] : std::uint64_t{};
+            if (candidate_part != current_part) {
+                return candidate_part > current_part;
+            }
+        }
+        return false;
+    }
+
+    static void FindAdjacentPackages(GameInfo& game, const PackageMetadata& base_package) {
+        const auto package_directory =
+            game.path.parent_path().empty() ? std::filesystem::current_path()
+                                            : game.path.parent_path();
+        std::error_code scan_error;
+        std::vector<std::filesystem::path> package_paths;
+        for (std::filesystem::directory_iterator it{
+                 package_directory, std::filesystem::directory_options::skip_permission_denied,
+                 scan_error},
+             end;
+             !scan_error && it != end; it.increment(scan_error)) {
+            std::error_code type_error;
+            if (it->is_regular_file(type_error) && !type_error &&
+                GameListUtils::IsPackagePath(it->path()) &&
+                it->path().lexically_normal() != game.path.lexically_normal()) {
+                package_paths.push_back(it->path());
+            }
+        }
+        std::ranges::sort(package_paths);
+
+        for (const auto& package_path : package_paths) {
+            const auto candidate = ReadPackageMetadata(package_path);
+            if (!candidate || candidate->title_id != base_package.title_id) {
+                continue;
+            }
+            if (candidate->category == "gp") {
+                const bool valid_first_version =
+                    game.version == "Unknown" &&
+                    ParsePackageVersion(candidate->version).has_value();
+                if (!candidate->version.empty() &&
+                    (valid_first_version ||
+                     IsPackageVersionNewer(candidate->version, game.version))) {
+                    game.package_update_path = package_path;
+                    game.version = candidate->version;
+                }
+            } else if (candidate->category == "ac") {
+                game.package_dlc_paths.push_back(package_path);
+            }
+        }
+    }
+
     static GameInfo readGameInfo(const std::filesystem::path& filePath) {
         GameInfo game;
         game.path = filePath;
@@ -56,11 +200,11 @@ public:
             PKG pkg;
             std::string failreason;
             PSF psf;
-            if (!pkg.Open(filePath, failreason) || !psf.Open(pkg.sfo)) {
+            if (!pkg.Open(filePath, failreason) || pkg.sfo.empty() || !psf.Open(pkg.sfo)) {
                 return game;
             }
-            const auto category = psf.GetString("CATEGORY");
-            if (!category.has_value() || *category != "gd") {
+            const auto package_metadata = GetPackageMetadata(psf);
+            if (!package_metadata || package_metadata->category != "gd") {
                 return game;
             }
 
@@ -82,9 +226,7 @@ public:
             } else if (const auto title = psf.GetString("TITLE"); title.has_value()) {
                 game.name = *title;
             }
-            if (const auto title_id = psf.GetString("TITLE_ID"); title_id.has_value()) {
-                game.serial = *title_id;
-            }
+            game.serial = package_metadata->title_id;
             if (const auto content_id = psf.GetString("CONTENT_ID");
                 content_id.has_value() && !content_id->empty()) {
                 game.region = GameListUtils::GetRegion(content_id->at(0)).toStdString();
@@ -104,8 +246,8 @@ public:
                                   .toStdString();
                 }
             }
-            if (const auto app_ver = psf.GetString("APP_VER"); app_ver.has_value()) {
-                game.version = *app_ver;
+            if (!package_metadata->version.empty()) {
+                game.version = package_metadata->version;
             }
             if (const auto play_time = psf.GetString("PLAY_TIME"); play_time.has_value()) {
                 game.play_time = *play_time;
@@ -115,6 +257,7 @@ public:
             } else {
                 game.save_dir = game.serial;
             }
+            FindAdjacentPackages(game, *package_metadata);
             return game;
         }
         std::filesystem::path param_sfo_path;

@@ -131,12 +131,18 @@ int GuiContextMenus::RequestGameMenu(const QPoint& pos, QVector<GameInfo>& m_gam
 
     const auto stem_path = Core::FileSys::StripZArchiveExtension(m_games[itemID].path);
     std::optional<std::filesystem::path> update_root;
-    for (const auto& suffix : {"-UPDATE", "-patch"}) {
-        std::filesystem::path overlay = stem_path;
-        overlay += suffix;
-        if (const auto resolved = Core::FileSys::ResolveGameRoot(overlay)) {
-            update_root = *resolved;
-            break;
+    if (GameListUtils::IsPackagePath(m_games[itemID].path)) {
+        if (!m_games[itemID].package_update_path.empty()) {
+            update_root = m_games[itemID].package_update_path;
+        }
+    } else {
+        for (const auto& suffix : {"-UPDATE", "-patch"}) {
+            std::filesystem::path overlay = stem_path;
+            overlay += suffix;
+            if (const auto resolved = Core::FileSys::ResolveGameRoot(overlay)) {
+                update_root = *resolved;
+                break;
+            }
         }
     }
 
@@ -153,7 +159,8 @@ int GuiContextMenus::RequestGameMenu(const QPoint& pos, QVector<GameInfo>& m_gam
     if (mods_root) {
         openFolderMenu->addAction(openModsFolder);
     }
-    if (std::filesystem::is_directory(dlc_root, dlc_ec)) {
+    if (!m_games[itemID].package_dlc_paths.empty() ||
+        std::filesystem::is_directory(dlc_root, dlc_ec)) {
         openFolderMenu->addAction(open_dlc_folder);
     }
     openFolderMenu->addAction(openLogFolder);
@@ -497,6 +504,16 @@ int GuiContextMenus::RequestGameMenu(const QPoint& pos, QVector<GameInfo>& m_gam
     }
 
     if (selected == openGameFolder) {
+        if (GameListUtils::IsPackagePath(m_games[itemID].path)) {
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(m_games[itemID].path, ec) || ec) {
+                QMessageBox::critical(widget, tr("Error"),
+                                      tr("This game has no game path to open!"));
+                return changedFavorite;
+            }
+            ShowInFileManager(m_games[itemID].path, widget);
+            return changedFavorite;
+        }
         const auto game_root = Core::FileSys::ResolveGameRoot(m_games[itemID].path);
         if (!game_root) {
             QMessageBox::critical(widget, tr("Error"), tr("This game has no game path to open!"));
@@ -506,6 +523,16 @@ int GuiContextMenus::RequestGameMenu(const QPoint& pos, QVector<GameInfo>& m_gam
     }
 
     if (selected == openUpdateFolder && update_root) {
+        if (GameListUtils::IsPackagePath(*update_root)) {
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(*update_root, ec) || ec) {
+                QMessageBox::critical(nullptr, tr("Error"),
+                                      tr("This game has no update path to open!"));
+                return changedFavorite;
+            }
+            ShowInFileManager(*update_root, widget);
+            return changedFavorite;
+        }
         const auto current_update_root = Core::FileSys::ResolveGameRoot(*update_root);
         if (!current_update_root) {
             QMessageBox::critical(nullptr, tr("Error"),
@@ -525,6 +552,11 @@ int GuiContextMenus::RequestGameMenu(const QPoint& pos, QVector<GameInfo>& m_gam
     }
 
     if (selected == open_dlc_folder) {
+        if (GameListUtils::IsPackagePath(m_games[itemID].path) &&
+            !m_games[itemID].package_dlc_paths.empty()) {
+            ShowInFileManager(m_games[itemID].package_dlc_paths.front(), widget);
+            return changedFavorite;
+        }
         std::error_code ec;
         if (!std::filesystem::is_directory(dlc_root, ec)) {
             QMessageBox::critical(widget, tr("Error"), tr("This game has no DLC path to open!"));
@@ -1099,13 +1131,8 @@ void GuiContextMenus::requestShortcut(const GameInfo& selectedInfo, QString emuP
     QString linkPath;
 
     // Eboot path
-    QString targetPath;
-    Common::FS::PathToQString(targetPath, selectedInfo.path);
-
-    QString ebootPath = targetPath + "/eboot.bin";
-    if (Core::FileSys::IsZArchiveFile(selectedInfo.path)) {
-        ebootPath = targetPath;
-    }
+    QString ebootPath;
+    Common::FS::PathToQString(ebootPath, GameListUtils::GetLaunchPath(selectedInfo));
 
     // Get the full path to the icon
     QString iconPath;
