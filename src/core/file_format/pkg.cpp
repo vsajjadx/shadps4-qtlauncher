@@ -84,6 +84,9 @@ bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
         file.Read(entry.offset);
         file.Read(entry.size);
         file.Seek(8, Common::FS::SeekOrigin::CurrentPosition);
+        // Reading an entry's data moves the file pointer, so remember where the next table entry
+        // starts and come back to it, otherwise every entry after param.sfo is read from garbage.
+        const s64 next_entry_pos = file.Tell();
 
         // Try to figure out the name
         const auto name = GetEntryNameByType(entry.id);
@@ -110,6 +113,10 @@ bool PKG::Open(const std::filesystem::path& filepath, std::string& failreason) {
         }
         destination->resize(entry.size);
         file.ReadRaw<u8>(destination->data(), entry.size);
+        if (!file.Seek(next_entry_pos)) {
+            failreason = "Failed to seek back to PKG table entry";
+            return false;
+        }
     }
     file.Close();
 
