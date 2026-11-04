@@ -1181,7 +1181,7 @@ void MainWindow::SaveWindowState() {
 void MainWindow::BootGame() {
     QFileDialog dialog;
     dialog.setFileMode(QFileDialog::ExistingFile);
-    dialog.setNameFilter(tr("bootable files (*.bin *.elf *.oelf *.zar)"));
+    dialog.setNameFilter(tr("bootable files (*.bin *.elf *.oelf *.zar *.pkg)"));
     if (dialog.exec()) {
         QStringList fileNames = dialog.selectedFiles();
         int nFiles = fileNames.size();
