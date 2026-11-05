@@ -433,6 +433,10 @@ struct GPUSettings {
     Setting<bool> userfaultfd{false};
     Setting<bool> inline_fetch_shader{false};
     Setting<bool> frame_generation_enabled{false};
+    Setting<std::string> frame_generation_backend{"FSR"};
+    Setting<bool> lemon_fg_high_quality{false};
+    Setting<bool> lemon_fg_hud_protection{true};
+    Setting<u32> lemon_fg_multiplier{2};
     Setting<bool> anti_aliasing{false};
     Setting<u32> resolution_scale{100};
     Setting<u32> anisotropic_filtering{0};
@@ -464,6 +468,13 @@ struct GPUSettings {
             make_override<GPUSettings>("inline_fetch_shader", &GPUSettings::inline_fetch_shader),
             make_override<GPUSettings>("frame_generation_enabled",
                                        &GPUSettings::frame_generation_enabled),
+            make_override<GPUSettings>("frame_generation_backend",
+                                       &GPUSettings::frame_generation_backend),
+            make_override<GPUSettings>("lemon_fg_high_quality",
+                                       &GPUSettings::lemon_fg_high_quality),
+            make_override<GPUSettings>("lemon_fg_hud_protection",
+                                       &GPUSettings::lemon_fg_hud_protection),
+            make_override<GPUSettings>("lemon_fg_multiplier", &GPUSettings::lemon_fg_multiplier),
             make_override<GPUSettings>("anti_aliasing", &GPUSettings::anti_aliasing),
             make_override<GPUSettings>("resolution_scale", &GPUSettings::resolution_scale),
             make_override<GPUSettings>("anisotropic_filtering",
@@ -480,6 +491,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GPUSettings, window_width, window_height, int
                                    vblank_frequency, full_screen, full_screen_mode, present_mode,
                                    hdr_allowed, fsr_enabled, rcas_enabled, rcas_attenuation,
                                    userfaultfd, inline_fetch_shader, frame_generation_enabled,
+                                   frame_generation_backend, lemon_fg_high_quality,
+                                   lemon_fg_hud_protection, lemon_fg_multiplier,
                                    anti_aliasing, resolution_scale, anisotropic_filtering,
                                    brightness, contrast)
 
@@ -761,6 +774,10 @@ public:
     SETTING_FORWARD_BOOL(m_gpu, UserfaultfdTracking, userfaultfd)
     SETTING_FORWARD_BOOL_READONLY(m_gpu, InlineFetchShader, inline_fetch_shader)
     SETTING_FORWARD_BOOL(m_gpu, FrameGenerationEnabled, frame_generation_enabled)
+    SETTING_FORWARD(m_gpu, FrameGenerationBackend, frame_generation_backend)
+    SETTING_FORWARD_BOOL(m_gpu, LemonFgHighQuality, lemon_fg_high_quality)
+    SETTING_FORWARD_BOOL(m_gpu, LemonFgHudProtection, lemon_fg_hud_protection)
+    SETTING_FORWARD(m_gpu, LemonFgMultiplier, lemon_fg_multiplier)
     SETTING_FORWARD_BOOL(m_gpu, AntiAliasing, anti_aliasing)
     SETTING_FORWARD(m_gpu, ResolutionScale, resolution_scale)
     SETTING_FORWARD(m_gpu, AnisotropicFiltering, anisotropic_filtering)

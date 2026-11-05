@@ -73,6 +73,10 @@ private:
 
     QComboBox* resolutionComboBox{};
     QCheckBox* frameGenCheckBox{};
+    QComboBox* frameGenBackendComboBox{};
+    QCheckBox* lemonFgHighQualityCheckBox{};
+    QCheckBox* lemonFgHudProtectionCheckBox{};
+    QComboBox* lemonFgMultiplierComboBox{};
     QCheckBox* antiAliasingCheckBox{};
     QComboBox* resolutionScaleComboBox{};
     QComboBox* anisotropicComboBox{};

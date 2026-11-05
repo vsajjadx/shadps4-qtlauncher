@@ -575,6 +575,10 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
         ui->graphicsAdapterGroupBox->installEventFilter(this);
         ui->windowSizeGroupBox->installEventFilter(this);
         frameGenCheckBox->installEventFilter(this);
+        frameGenBackendComboBox->installEventFilter(this);
+        lemonFgHighQualityCheckBox->installEventFilter(this);
+        lemonFgHudProtectionCheckBox->installEventFilter(this);
+        lemonFgMultiplierComboBox->installEventFilter(this);
         antiAliasingCheckBox->installEventFilter(this);
         resolutionScaleComboBox->installEventFilter(this);
         anisotropicComboBox->installEventFilter(this);
@@ -794,6 +798,18 @@ void SettingsDialog::LoadValuesFromConfig() {
     ui->enableHDRCheckBox->setChecked(EmulatorSettings.IsHdrAllowed());
     SyncResolutionComboBox();
     frameGenCheckBox->setChecked(EmulatorSettings.IsFrameGenerationEnabled());
+    {
+        const int backendIndex = frameGenBackendComboBox->findData(
+            QString::fromStdString(EmulatorSettings.GetFrameGenerationBackend()));
+        frameGenBackendComboBox->setCurrentIndex(backendIndex >= 0 ? backendIndex : 0);
+    }
+    lemonFgHighQualityCheckBox->setChecked(EmulatorSettings.IsLemonFgHighQuality());
+    lemonFgHudProtectionCheckBox->setChecked(EmulatorSettings.IsLemonFgHudProtection());
+    {
+        const int multiplierIndex =
+            lemonFgMultiplierComboBox->findData(EmulatorSettings.GetLemonFgMultiplier());
+        lemonFgMultiplierComboBox->setCurrentIndex(multiplierIndex >= 0 ? multiplierIndex : 0);
+    }
     LoadDlss5Settings();
     antiAliasingCheckBox->setChecked(EmulatorSettings.IsAntiAliasing());
     SyncImageQualityComboBoxes();
@@ -1066,8 +1082,16 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
         text = tr("Contrast:\\nMakes the difference between dark and bright tones larger or smaller. 100% shows the image as the game draws it. Higher values make the picture punchier, lower values flatter. It can also be changed while playing from the game window's title bar menu.");
     } else if (elementName == "anisotropicComboBox") {
         text = tr("Anisotropic Filtering:\\nMakes textures sharper on surfaces seen at a steep angle, such as roads and floors. Higher values look better and cost a little GPU time. Off leaves it as the game sets it.");
+    } else if (elementName == "frameGenBackendComboBox") {
+        text = tr("Frame Generation Method:\\nFSR 3.1: AMD FidelityFX frame generation, Windows builds only.\\nLemon FG: a light frame generator that works on any GPU with subgroup support. It only looks at the finished picture, so small fast objects can smear and see-through HUD over a moving scene can be dragged along.\\nBoth add one generated frame between every two game frames. The in-game key that turns frame generation on and off is set in Hotkeys (default: 1) and drives the method chosen here.");
+    } else if (elementName == "lemonFgHighQualityCheckBox") {
+        text = tr("Lemon FG: High Quality:\\nSearches motion at half the window resolution instead of a quarter. Small and fast moving objects follow their motion better and smear less, at about four times the cost of the motion search. Turn it off if frame generation makes the game slower.");
+    } else if (elementName == "lemonFgHudProtectionCheckBox") {
+        text = tr("Lemon FG: HUD Protection:\\nKeeps what does not move on screen, such as the HUD, health bars and subtitles, in place in the generated frames instead of dragging it along with the moving scene. Turn it off if parts of a moving scene look frozen or doubled in a game with film grain or a constantly animated HUD.");
+    } else if (elementName == "lemonFgMultiplierComboBox") {
+        text = tr("Lemon FG: Multiplier:\\nHow many frames are shown for every game frame. 2x adds one generated frame, 3x two, 4x three and 6x five. A 30 FPS game shows 60, 90, 120 or 180 frames per second, so pick a multiplier your monitor's refresh rate can show. Higher multipliers use more video memory and GPU time, and the generated frames' mistakes are easier to see.");
     } else if (elementName == "frameGenCheckBox") {
-        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with AMD FSR 3.1, so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
+        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with the method chosen below (FSR 3.1 or Lemon FG), so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
     } else if (elementName == "heightDivider") {
         text = tr("Vblank Frequency:\\nThe frame rate at which the emulator refreshes at (60hz is the baseline, whether the game runs at 30 or 60fps). Changing this may have adverse effects, such as increasing the game speed, or breaking critical game functionality that does not expect this to change!");
     } else if (elementName == "dumpShadersCheckBox") {
@@ -1231,6 +1255,13 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
     EmulatorSettings.SetHdrAllowed(ui->enableHDRCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetFsrEnabled(ui->FSRCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetFrameGenerationEnabled(frameGenCheckBox->isChecked(), is_specific);
+    EmulatorSettings.SetFrameGenerationBackend(
+        frameGenBackendComboBox->currentData().toString().toStdString(), is_specific);
+    EmulatorSettings.SetLemonFgHighQuality(lemonFgHighQualityCheckBox->isChecked(), is_specific);
+    EmulatorSettings.SetLemonFgHudProtection(lemonFgHudProtectionCheckBox->isChecked(),
+                                             is_specific);
+    EmulatorSettings.SetLemonFgMultiplier(lemonFgMultiplierComboBox->currentData().toUInt(),
+                                          is_specific);
     SaveDlss5Settings();
     EmulatorSettings.SetAntiAliasing(antiAliasingCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetResolutionScale(resolutionScaleComboBox->currentData().toUInt(),
@@ -1649,6 +1680,37 @@ void SettingsDialog::SetupGraphicsExtras() {
     frameGenCheckBox = new QCheckBox(tr("Enable Frame Generation"), ui->FSRGroupBox);
     frameGenCheckBox->setObjectName("frameGenCheckBox");
     ui->verticalLayout_5->insertWidget(0, frameGenCheckBox);
+
+    frameGenBackendComboBox = new QComboBox(ui->FSRGroupBox);
+    frameGenBackendComboBox->setObjectName("frameGenBackendComboBox");
+    frameGenBackendComboBox->addItem(tr("FSR 3.1"), QStringLiteral("FSR"));
+    frameGenBackendComboBox->addItem(tr("Lemon FG"), QStringLiteral("Lemon"));
+    ui->verticalLayout_5->insertWidget(1, frameGenBackendComboBox);
+
+    lemonFgHighQualityCheckBox = new QCheckBox(tr("Lemon FG: High Quality"), ui->FSRGroupBox);
+    lemonFgHighQualityCheckBox->setObjectName("lemonFgHighQualityCheckBox");
+    ui->verticalLayout_5->insertWidget(2, lemonFgHighQualityCheckBox);
+
+    lemonFgHudProtectionCheckBox = new QCheckBox(tr("Lemon FG: HUD Protection"), ui->FSRGroupBox);
+    lemonFgHudProtectionCheckBox->setObjectName("lemonFgHudProtectionCheckBox");
+    ui->verticalLayout_5->insertWidget(3, lemonFgHudProtectionCheckBox);
+
+    lemonFgMultiplierComboBox = new QComboBox(ui->FSRGroupBox);
+    lemonFgMultiplierComboBox->setObjectName("lemonFgMultiplierComboBox");
+    for (const uint multiplier : {2u, 3u, 4u, 6u}) {
+        lemonFgMultiplierComboBox->addItem(tr("Lemon FG: %1x").arg(multiplier), multiplier);
+    }
+    ui->verticalLayout_5->insertWidget(4, lemonFgMultiplierComboBox);
+
+    const auto updateLemonFgOptions = [this] {
+        const bool lemon = frameGenBackendComboBox->currentData().toString() == "Lemon";
+        lemonFgHighQualityCheckBox->setEnabled(lemon);
+        lemonFgHudProtectionCheckBox->setEnabled(lemon);
+        lemonFgMultiplierComboBox->setEnabled(lemon);
+    };
+    connect(frameGenBackendComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            updateLemonFgOptions);
+    updateLemonFgOptions();
 
     imageQualityGroupBox = new QGroupBox(tr("Image Quality"), this);
     imageQualityGroupBox->setObjectName("imageQualityGroupBox");
