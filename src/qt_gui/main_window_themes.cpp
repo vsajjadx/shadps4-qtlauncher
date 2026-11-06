@@ -194,4 +194,5 @@ void WindowThemes::SetWindowTheme(Theme theme, QLineEdit* mw_searchbar) {
                             "border: 1px solid #808080; border-radius: 4px; }");
         break;
     }
+    mw_searchbar->setStyleSheet("");
 }

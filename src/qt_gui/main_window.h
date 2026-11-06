@@ -62,6 +62,7 @@ private Q_SLOTS:
 private:
     Ui_MainWindow* ui;
     void AddUiWidgets();
+    void ApplyModernStyle();
     void UpdateToolbarLabels();
     void UpdateToolbarButtons();
     QWidget* createButtonWithLabel(QPushButton* button, const QString& labelText, bool showLabel);

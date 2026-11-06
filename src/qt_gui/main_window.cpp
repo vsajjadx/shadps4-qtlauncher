@@ -95,6 +95,7 @@ bool MainWindow::Init() {
     CreateDockWindows(true);
     CreateConnects();
     SetLastUsedTheme();
+    ApplyModernStyle();
     SetLastIconSizeBullet();
     // show ui
     setMinimumSize(900, 405);
@@ -241,6 +242,69 @@ QWidget* createSpacer(QWidget* parent) {
     spacer->setFixedWidth(15);
     spacer->setFixedHeight(15);
     return spacer;
+}
+
+void MainWindow::ApplyModernStyle() {
+    for (QPushButton* button :
+         {ui->playButton, ui->pauseButton, ui->stopButton, ui->restartButton, ui->settingsButton,
+          ui->fullscreenButton, ui->controllerButton, ui->keyboardButton, ui->refreshButton}) {
+        button->setIconSize(QSize(26, 26));
+        button->setMinimumSize(58, 42);
+        button->setCursor(Qt::PointingHandCursor);
+    }
+    ui->playButton->setObjectName("primaryToolButton");
+    ui->mw_searchbar->setFixedWidth(260);
+    ui->mw_searchbar->setPlaceholderText(tr("Search games"));
+    ui->sizeSliderContainer->setFixedWidth(260);
+    ui->toolBar->setMovable(false);
+    if (m_dock_widget) {
+        m_dock_widget->setTitleBarWidget(new QWidget(m_dock_widget.data()));
+    }
+
+    setStyleSheet(R"(
+        QToolBar#toolBar { border: none; padding: 8px 12px; spacing: 2px;
+                           border-bottom: 1px solid rgba(127, 127, 127, 60); }
+        QToolBar#toolBar QPushButton { border: none; border-radius: 10px; background: transparent; }
+        QToolBar#toolBar QPushButton:hover { background: rgba(127, 127, 127, 45); }
+        QToolBar#toolBar QPushButton:pressed { background: rgba(127, 127, 127, 80); }
+        QToolBar#toolBar QPushButton#primaryToolButton { background: palette(highlight); }
+        QToolBar#toolBar QPushButton#primaryToolButton:hover {
+            border: 2px solid rgba(255, 255, 255, 90); }
+        QToolBar#toolBar QLabel { font-size: 9pt; }
+        QLineEdit#mw_searchbar { border: 1px solid rgba(127, 127, 127, 110); border-radius: 10px;
+                                 padding: 6px 10px; background: palette(base); color: palette(text); }
+        QLineEdit#mw_searchbar:focus { border-color: palette(highlight); }
+        QComboBox#versionComboBox, QToolBar#toolBar QPushButton#versionManagerButton {
+            border: 1px solid rgba(127, 127, 127, 110); border-radius: 8px; padding: 5px 10px;
+            background: palette(button); }
+        QComboBox#versionComboBox:hover, QToolBar#toolBar QPushButton#versionManagerButton:hover {
+            border-color: palette(highlight); }
+        QComboBox#versionComboBox::drop-down { border: none; width: 18px; }
+        QTableView { border: none; outline: 0; }
+        QTableView::item { border-bottom: 1px solid rgba(127, 127, 127, 35); padding: 2px 6px; }
+        QTableView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+        QHeaderView::section { border: none; border-bottom: 1px solid rgba(127, 127, 127, 80);
+                               padding: 8px 6px; background: palette(window); font-weight: 600; }
+        QMenuBar { padding: 2px 6px; }
+        QMenuBar::item { padding: 5px 10px; border-radius: 6px; background: transparent; }
+        QMenuBar::item:selected { background: rgba(127, 127, 127, 50); }
+        QMenu { border: 1px solid rgba(127, 127, 127, 90); border-radius: 8px; padding: 6px; }
+        QMenu::item { padding: 6px 26px 6px 22px; border-radius: 6px; }
+        QMenu::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+        QMenu::separator { height: 1px; background: rgba(127, 127, 127, 70); margin: 5px 8px; }
+        QScrollBar:vertical { width: 10px; background: transparent; margin: 2px; }
+        QScrollBar:horizontal { height: 10px; background: transparent; margin: 2px; }
+        QScrollBar::handle { background: rgba(127, 127, 127, 110); border-radius: 4px;
+                             min-height: 30px; min-width: 30px; }
+        QScrollBar::handle:hover { background: rgba(127, 127, 127, 170); }
+        QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+        QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+        QStatusBar { color: palette(placeholder-text); border-top: 1px solid rgba(127, 127, 127, 60); }
+        QSlider#sizeSlider::groove:horizontal { height: 4px; border-radius: 2px;
+                                                background: rgba(127, 127, 127, 90); }
+        QSlider#sizeSlider::handle:horizontal { width: 14px; margin: -5px 0; border-radius: 7px;
+                                                background: palette(highlight); }
+    )");
 }
 
 void MainWindow::AddUiWidgets() {
