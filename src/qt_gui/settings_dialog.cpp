@@ -2129,6 +2129,15 @@ void SettingsDialog::SetupGraphicsExtras() {
         row->addWidget(valueLabel);
         target->addLayout(row);
     };
+    dlss5NetworkComboBox = new QComboBox(dlss5GroupBox);
+    dlss5NetworkComboBox->setObjectName("dlss5NetworkComboBox");
+    dlss5NetworkComboBox->addItem(tr("Default"), 0);
+    dlss5NetworkComboBox->addItem(tr("Full Quality"), 1);
+    dlss5NetworkComboBox->addItem(tr("Fast"), 2);
+    dlss5NetworkComboBox->setToolTip(
+        tr("Neural network DLSS5 runs. Full Quality looks best; Fast uses a smaller network that "
+           "costs less GPU time."));
+    addDlss5Row(new QLabel(tr("Network:"), dlss5GroupBox), dlss5NetworkComboBox);
     addDlss5SliderRow(dlss5Layout, tr("DLSS5 Intensity:"), dlss5IntensitySlider, 0, 100, 100);
 
     // Fine tuning: the NGX style and the three strengths.
@@ -2178,6 +2187,7 @@ void SettingsDialog::LoadDlss5Settings() {
 
     dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
     selectData(dlss5StyleComboBox, qBound(0, j.value("Style").toInt(0), 2));
+    selectData(dlss5NetworkComboBox, qBound(0, j.value("Preset").toInt(0), 2));
     setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
     setSlider(dlss5GlobalToneSlider, j.value("GlobalTone").toDouble(1.0), 0.0, 2.0);
     setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(1.5), 0.0, 2.0);
@@ -2189,6 +2199,7 @@ void SettingsDialog::SaveDlss5Settings() {
     QJsonObject j;
     j["Enabled"] = dlss5CheckBox->isChecked();
     j["Style"] = dlss5StyleComboBox->currentData().toInt();
+    j["Preset"] = dlss5NetworkComboBox->currentData().toInt();
     j["Intensity"] = dlss5IntensitySlider->value() * 0.01;
     j["GlobalTone"] = dlss5GlobalToneSlider->value() * 0.01;
     j["LocalTone"] = dlss5LocalToneSlider->value() * 0.01;

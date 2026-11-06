@@ -99,6 +99,7 @@ private:
     QGroupBox* dlss5GroupBox{};
     QCheckBox* dlss5CheckBox{};
     QComboBox* dlss5StyleComboBox{};
+    QComboBox* dlss5NetworkComboBox{};
     QSlider* dlss5IntensitySlider{};
     QSlider* dlss5GlobalToneSlider{};
     QSlider* dlss5LocalToneSlider{};
