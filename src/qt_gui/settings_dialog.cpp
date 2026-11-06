@@ -1002,195 +1002,195 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
     // clang-format off
     // General
     if (elementName == "consoleLanguageGroupBox") {
-        text = tr("Console Language:\\nSets the language that the PS4 game uses.\\nIt's recommended to set this to a language the game supports, which will vary by region.");
+        text = tr("Console Language:\\nLanguage the game runs in. Pick one the game's region supports.");
     } else if (elementName == "emulatorLanguageGroupBox") {
-        text = tr("Emulator Language:\\nSets the language of the emulator's user interface.");
+        text = tr("Launcher Language:\\nLanguage of this interface.");
     } else if (elementName == "showSplashCheckBox") {
-        text = tr("Show Splash Screen:\\nShows the game's splash screen (a special image) while the game is starting.");
+        text = tr("Splash Screen:\\nShow the game's splash image while it starts.");
     } else if (elementName == "discordRPCCheckbox") {
-        text = tr("Enable Discord Rich Presence:\\nDisplays the emulator icon and relevant information on your Discord profile.");
+        text = tr("Discord Rich Presence:\\nShow the game you are playing on your Discord profile.");
     #ifdef ENABLE_UPDATER
     } else if (elementName == "updaterGroupBox") {
-        text = tr("GUI Updates:\\nRelease: Official versions released every month that may be very outdated, but are more reliable and tested.\\nNightly: Development versions that have all the latest features and fixes, but may contain bugs and are less stable.\\n\\n*This update applies only to the Qt user interface. To update the emulator core, please use the 'Version Manager' menu.");
+        text = tr("Launcher Updates:\\nRelease: monthly, tested.\\nNightly: newest features, less stable.\\nThe emulator itself is updated from Version Manager.");
 #endif
     } else if (elementName == "GUIBackgroundImageGroupBox") {
-        text = tr("Background Image:\\nControl the opacity of the game background image.");
+        text = tr("Background Image:\\nOpacity of the selected game's background art.");
     } else if (elementName == "GUIMusicGroupBox") {
-        text = tr("Play Title Music:\\nIf a game supports it, enable playing special music when selecting the game in the GUI.");
+        text = tr("Title Music:\\nPlay the game's theme when it is selected.");
     } else if (elementName == "enableHDRCheckBox") {
-        text = tr("Enable HDR:\\nEnables HDR in games that support it.\\nYour monitor must have support for the BT2020 PQ color space and the RGB10A2 swapchain format.");
+        text = tr("HDR:\\nHDR output for games that support it. Needs an HDR10 (BT.2020 PQ) display.");
     } else if (elementName == "disableTrophycheckBox") {
-        text = tr("Disable Trophy Pop-ups:\\nDisable in-game trophy notifications. Trophy progress can still be tracked using the Trophy Viewer (right-click the game in the main window).");
+        text = tr("Hide Trophy Pop-ups:\\nTrophies still unlock; view them in Trophy Viewer.");
     } else if (elementName == "enableCompatibilityCheckBox") {
-        text = tr("Display Compatibility Data:\\nDisplays game compatibility information in table view. Enable \"Update Compatibility On Startup\" to get up-to-date information.");
+        text = tr("Compatibility:\\nShow each game's compatibility status in the list.");
     } else if (elementName == "checkCompatibilityOnStartupCheckBox") {
-        text = tr("Update Compatibility On Startup:\\nAutomatically update the compatibility database when shadPS4 starts.");
+        text = tr("Update on Startup:\\nRefresh the compatibility database when the launcher opens.");
     } else if (elementName == "updateCompatibilityButton") {
-        text = tr("Update Compatibility Database:\\nImmediately update the compatibility database.");
+        text = tr("Update Now:\\nRefresh the compatibility database.");
     }
 
     // Log
     if (elementName == "logAppendCheckBox") {
-        text = tr("Log Append:\\nAppend to existing logs.");
+        text = tr("Append:\\nAdd to the existing log instead of replacing it.");
     } else if (elementName == "logEnableCheckBox") {
-        text = tr("Enable Logging:\\nEnables logging.\\nDo not change this if you do not know what you're doing!\\nWhen asking for help, make sure this setting is ENABLED.");
+        text = tr("Logging:\\nWrite a log file. Keep it on when reporting a problem.");
     } else if (elementName == "logFilter") {
-        text = tr("Log Filter:\\nFilters the log to only print specific information.\\nExamples: \"Core:Debug\" \"Lib.Pad:Debug Common.Filesystem:Error\" \"*:Critical\"\\nLevels: trace, debug, info, warning, error, critical, off - in this order, a specific level silences all levels preceding it in the list and logs every level after it.");
+        text = tr("Log Filter:\\nClass:level pairs, e.g. \"*:info Render.Vulkan:debug\".\\nLevels: trace, debug, info, warning, error, critical, off. Use the table or presets to build it.");
     } else if (elementName == "logMaxSkipDurationLineEdit") {
-        text = tr("Log Max Skip Duration:\\nInterval without writing same lines (ms) - only if 'Log Skip Duplicate' enabled."); //TODO grey out if disabled
+        text = tr("Skip Window:\\nHow long (ms) repeated lines are dropped when Skip Duplicates is on."); //TODO grey out if disabled
     } else if (elementName == "logOpenLocationButton") {
-        text = tr("Open Log Location:\\nOpen the folder where the log file is saved.");
+        text = tr("Open Log Folder:\\nOpen the folder that holds the log files.");
     } else if (elementName == "logSeparateCheckBox") {
-        text = tr("Separate Log Files:\\nWrites a separate logfile for each game.");
+        text = tr("One Log per Game:\\nWrite each game to its own log file.");
     } else if (elementName == "logSizeLimitLineEdit") {
-        text = tr("Log Size Limit:\\nMaximum size of log files (bytes).");
+        text = tr("Size Limit:\\nLargest a log file may grow, in bytes.");
     } else if (elementName == "logSkipDuplicateCheckBox") {
-        text = tr("Log Skip Duplicate:\\nSave storage by avoiding writing log that is identical.");
+        text = tr("Skip Duplicates:\\nDrop lines identical to the previous one.");
     } else if (elementName == "logSyncCheckBox") {
-        text = tr("Log Sync:\\nSwitch between sync (order) or async (performance).");
+        text = tr("Synchronous:\\nWrite lines in strict order. Off is faster.");
     } else if (elementName == "logTypeGroupBox") {
-        text = tr("Log Type:\\nChoose between wincolor or msvc log types.\\nwincolor: Default logging for Windows\\nmsvc: Logging for debugging");
+        text = tr("Log Type:\\nwincolor: normal console output.\\nmsvc: send output to the debugger.");
     }
 
     //User
     if (elementName == "OpenCustomTrophyLocationButton") {
-        text = tr("Open the custom trophy images/sounds folder:\\nYou can add custom images to the trophies and an audio.\\nAdd the files to custom_trophy with the following names:\\ntrophy.wav OR trophy.mp3, bronze.png, gold.png, platinum.png, silver.png\\nNote: The sound will only work in QT versions.");
+        text = tr("Custom Trophies:\\nPut trophy.wav or trophy.mp3 and bronze/silver/gold/platinum.png in this folder to replace the pop-up art and sound.");
     }
 
     // Input
     if (elementName == "hideCursorGroupBox") {
-        text = tr("Hide Cursor:\\nChoose when the cursor will disappear:\\nNever: You will always see the mouse.\\nidle: Set a time for it to disappear after being idle.\\nAlways: you will never see the mouse.");
+        text = tr("Hide Cursor:\\nNever, after being idle, or always.");
     } else if (elementName == "idleTimeoutGroupBox") {
-        text = tr("Hide Idle Cursor Timeout:\\nThe duration (seconds) after which the cursor that has been idle hides itself.");
+        text = tr("Idle Timeout:\\nSeconds before an idle cursor hides.");
     } else if (elementName == "backgroundControllerCheckBox") {
-        text = tr("Enable Controller Background Input:\\nAllow shadPS4 to detect controller inputs when the game window is not in focus.");
+        text = tr("Background Input:\\nRead the controller while the game window is not focused.");
     }
 
     // Graphics
     if (elementName == "graphicsAdapterGroupBox") {
-        text = tr("Graphics Device:\\nOn multiple GPU systems, select the GPU the emulator will use from the drop down list,\\nor select \"Auto Select\" to automatically determine it.");
+        text = tr("Graphics Device:\\nGPU used by the emulator. Auto picks the best one.");
     } else if (elementName == "presentModeGroupBox") {
         text = tr("Present Mode:\\nConfigures how video output will be presented to your screen.\\n\\n"
                   "Mailbox: Frames synchronize with your screen's refresh rate. New frames will replace any pending frames. Reduces latency but may skip frames if running behind.\\n"
                   "Fifo: Frames synchronize with your screen's refresh rate. New frames will be queued behind pending frames. Ensures all frames are presented but may increase latency.\\n"
                   "Immediate: Frames immediately present to your screen when ready. May result in tearing.");
     } else if (elementName == "windowSizeGroupBox") {
-        text = tr("Window Size:\\nPick the size of the emulator window at launch. It can be resized during gameplay.\\nThis is different from the in-game resolution.");
+        text = tr("Window Size:\\nWindow size at launch. Not the game's render resolution.");
     } else if (elementName == "antiAliasingCheckBox") {
-        text = tr("Anti-Aliasing (FXAA):\\nSmooths jagged edges in the final image. It is applied after the game is drawn, so it works in every game and costs very little performance.");
+        text = tr("FXAA:\\nSmooths jagged edges at almost no cost.");
     } else if (elementName == "resolutionScaleComboBox") {
-        text = tr("Resolution Scaling:\\nScales the screen resolution that the emulator reports to the game. Games that choose their render resolution from it draw at the scaled size; games that always draw at a fixed size are not changed. Applies the next time a game starts.");
+        text = tr("Resolution Scaling:\\nScales the resolution reported to the game. Only affects games that render at that size. Applies on next launch.");
     } else if (elementName == "brightnessSlider") {
-        text = tr("Brightness:\\nMakes the image brighter or darker. 100% shows it as the game draws it. Black and white stay as they are; the tones in between change, so dark scenes become easier to see without washing out bright areas. It can also be changed while playing: right-click the game window's title bar and choose Brightness / Contrast.");
+        text = tr("Brightness:\\n100% is unchanged. Lifts or lowers mid-tones; blacks and whites stay. Also in the game window's title bar menu.");
     } else if (elementName == "contrastSlider") {
-        text = tr("Contrast:\\nMakes the difference between dark and bright tones larger or smaller. 100% shows the image as the game draws it. Higher values make the picture punchier, lower values flatter. It can also be changed while playing from the game window's title bar menu.");
+        text = tr("Contrast:\\n100% is unchanged. Higher is punchier, lower is flatter. Also in the game window's title bar menu.");
     } else if (elementName == "anisotropicComboBox") {
-        text = tr("Anisotropic Filtering:\\nMakes textures sharper on surfaces seen at a steep angle, such as roads and floors. Higher values look better and cost a little GPU time. Off leaves it as the game sets it.");
+        text = tr("Anisotropic Filtering:\\nSharper textures on angled surfaces. Off keeps the game's setting.");
     } else if (elementName == "frameGenBackendComboBox") {
-        text = tr("Frame Generation Method:\\nFSR 3.1: AMD FidelityFX frame generation, Windows builds only.\\nMulti FG: a light frame generator that works on any GPU with subgroup support. It only looks at the finished picture, so small fast objects can smear and see-through HUD over a moving scene can be dragged along.\\nBoth add one generated frame between every two game frames. The in-game key that turns frame generation on and off is set in Hotkeys (default: 1) and drives the method chosen here.");
+        text = tr("Frame Generation Method:\\nFSR 3.1: AMD frame generation.\\nMulti FG: works on any GPU, supports 2x-6x. Fast small objects may smear.");
     } else if (elementName == "lemonFgHighQualityCheckBox") {
-        text = tr("Multi FG: High Quality:\\nSearches motion at half the window resolution instead of a quarter. Small and fast moving objects follow their motion better and smear less, at about four times the cost of the motion search. Turn it off if frame generation makes the game slower.");
+        text = tr("High Quality:\\nFiner motion search, less smearing, more GPU time.");
     } else if (elementName == "lemonFgHudProtectionCheckBox") {
-        text = tr("Multi FG: HUD Protection:\\nKeeps what does not move on screen, such as the HUD, health bars and subtitles, in place in the generated frames instead of dragging it along with the moving scene. Turn it off if parts of a moving scene look frozen or doubled in a game with film grain or a constantly animated HUD.");
+        text = tr("HUD Protection:\\nKeeps static HUD in place. Turn off if parts of the scene look frozen.");
     } else if (elementName == "lemonFgMultiplierComboBox") {
-        text = tr("Multi FG: Multiplier:\\nHow many frames are shown for every game frame. 2x adds one generated frame, 3x two, 4x three and 6x five. A 30 FPS game shows 60, 90, 120 or 180 frames per second, so pick a multiplier your monitor's refresh rate can show. Higher multipliers use more video memory and GPU time, and the generated frames' mistakes are easier to see.");
+        text = tr("Multiplier:\\nFrames shown per game frame. Match it to your refresh rate; higher costs more GPU and VRAM.");
     } else if (elementName == "frameGenCheckBox") {
-        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with the method chosen below (FSR 3.1 or Multi FG), so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
+        text = tr("Frame Generation:\\nInserts generated frames for smoother motion. Best above 30 FPS. Toggle key is set in Hotkeys (default 1).");
     } else if (elementName == "heightDivider") {
-        text = tr("Vblank Frequency:\\nThe frame rate at which the emulator refreshes at (60hz is the baseline, whether the game runs at 30 or 60fps). Changing this may have adverse effects, such as increasing the game speed, or breaking critical game functionality that does not expect this to change!");
+        text = tr("Vblank Frequency:\\nEmulated display refresh. Keep 60 Hz; other values can speed up or break games.");
     } else if (elementName == "dumpShadersCheckBox") {
-        text = tr("Enable Shaders Dumping:\\nFor the sake of technical debugging, saves the game's shaders to a folder as they render.");
+        text = tr("Dump Shaders:\\nSave the game's shaders to disk.");
     }
 
     // Path
     if (elementName == "gameFoldersGroupBox" || elementName == "gameFoldersListWidget") {
-        text = tr("Game Folders:\\nThe list of folders to check for installed games.");
+        text = tr("Game Folders:\\nFolders scanned for installed games.");
     } else if (elementName == "addFolderButton") {
-        text = tr("Add:\\nAdd a folder to the list.");
+        text = tr("Add:\\nAdd a game folder.");
     } else if (elementName == "removeFolderButton") {
-        text = tr("Remove:\\nRemove a folder from the list.");
+        text = tr("Remove:\\nRemove the selected folder.");
     } else if (elementName == "PortableUserFolderGroupBox") {
-        text = tr("Portable user folder:\\nStores shadPS4 settings and data that will be applied only to the shadPS4 build located in the current folder. Restart the app after creating the portable user folder to begin using it.");
+        text = tr("Portable User Folder:\\nKeep settings and data next to this build. Restart after creating it.");
     } else if (elementName == "sysmodulesGroupBox") {
-        text = tr("PS4 Sysmodules Path:\\nThe folder where PS4 sysmodules are loaded from.");
+        text = tr("Sysmodules:\\nFolder PS4 system modules are loaded from.");
     } else if (elementName == "browse_sysmodules") {
-        text = tr("Browse:\\nBrowse for a folder to set as the sysmodules path.");
+        text = tr("Browse:\\nChoose the sysmodules folder.");
     } else if (elementName == "fontsGroupBox" || elementName == "fontsPath") {
-        text = tr("PS4 Fonts Path:\\nThe folder where PS4 system fonts are loaded from.");
+        text = tr("Fonts:\\nFolder PS4 system fonts are loaded from.");
     } else if (elementName == "browse_fonts") {
-        text = tr("Browse:\\nBrowse for a folder to set as the fonts path.");
+        text = tr("Browse:\\nChoose the fonts folder.");
     }
 
     // DLC Folder
     if (elementName == "dlcFolderGroupBox" || elementName == "currentDLCFolder") {
-        text = tr("DLC Path:\\nThe folder where game DLC is loaded from.");
+        text = tr("DLC:\\nFolder game DLC is loaded from.");
     } else if (elementName == "folderButton") {
-        text = tr("Browse:\\nBrowse for a folder to set as the DLC path.");
+        text = tr("Browse:\\nChoose the DLC folder.");
     }
 
     // Save Data
     if (elementName == "homeFolderGroupBox" || elementName == "homeFolderPath") {
-        text = tr("Home Folder Location:\\nThe folder where save data, trophy files, and input configs are stored for all users.");
+        text = tr("Home Folder:\\nSaves, trophies and input configs for all users.");
     } else if (elementName == "homeFolderButton") {
-        text = tr("Browse:\\nBrowse for a folder to set as the home folder.");
+        text = tr("Browse:\\nChoose the home folder.");
     }
 
     // Debug
     if (elementName == "debugDump") {
-        text = tr("Enable Debug Dumping:\\nSaves the import and export symbols and file header information of the currently running PS4 program to a directory.");
+        text = tr("Dump Executable Info:\\nSave the running program's symbols and headers.");
     } else if (elementName == "vkValidationCheckBox") {
-        text = tr("Enable Vulkan Validation Layers:\\nEnables a system that validates the state of the Vulkan renderer and logs information about its internal state.\\nThis will reduce performance and likely change the behavior of emulation.\\nYou need the Vulkan SDK for this to work.");
+        text = tr("Vulkan Validation:\\nCheck renderer calls and log problems. Slow; needs the Vulkan SDK.");
     } else if (elementName == "vkSyncValidationCheckBox") {
-        text = tr("Enable Sync Validation:\\nEnables a system that validates the timing of Vulkan rendering tasks.\\nThis will reduce performance and likely change the behavior of emulation.\\nYou need the Vulkan SDK for this to work.");
+        text = tr("Sync Validation:\\nCheck GPU synchronization. Slow; needs the Vulkan SDK.");
     } else if (elementName == "vkCoreValidationCheckBox") {
-        text = tr("Enable Core Validation:\\nEnables the main API validation functions.\\nThis will reduce performance and likely change the behavior of emulation.\\nYou need the Vulkan SDK for this to work.");
+        text = tr("Core Validation:\\nCheck API usage. Slow; needs the Vulkan SDK.");
     } else if (elementName == "vkGpuValidationCheckBox") {
-        text = tr("Enable GPU-Assisted Validation:\\nInstruments shaders with code that validates if they are behaving correctly.\\nThis will reduce performance and likely change the behavior of emulation.\\nYou need the Vulkan SDK for this to work.");
+        text = tr("GPU-Assisted Validation:\\nCheck shaders while they run. Very slow; needs the Vulkan SDK.");
     } else if (elementName == "rdocCheckBox") {
-        text = tr("Enable RenderDoc Debugging:\\nIf enabled, the emulator will provide compatibility with Renderdoc to allow capture and analysis of the currently rendered frame.");
+        text = tr("RenderDoc:\\nAllow RenderDoc to capture frames.");
     } else if (elementName == "crashDiagnosticsCheckBox") {
-        text = tr("Crash Diagnostics:\\nCreates a .yaml file with info about the Vulkan state at the time of crashing.\\nUseful for debugging 'Device lost' errors. If you have this enabled, you should enable Host AND Guest Debug Markers.\\nYou need Vulkan Validation Layers enabled and the Vulkan SDK for this to work.");
+        text = tr("Crash Diagnostics:\\nWrite a .yaml report on 'Device lost'. Use with both debug markers and Vulkan validation.");
     } else if (elementName == "guestMarkersCheckBox") {
-        text = tr("Guest Debug Markers:\\nInserts any debug markers the game itself has added to the command buffer.\\nIf you have this enabled, you should enable Crash Diagnostics.\\nUseful for programs like RenderDoc.");
+        text = tr("Guest Markers:\\nPass the game's own debug markers to Vulkan.");
     } else if (elementName == "hostMarkersCheckBox") {
-        text = tr("Host Debug Markers:\\nInserts emulator-side information like markers for specific AMDGPU commands around Vulkan commands, as well as giving resources debug names.\\nIf you have this enabled, you should enable Crash Diagnostics.\\nUseful for programs like RenderDoc.");
+        text = tr("Host Markers:\\nAdd emulator markers and resource names for debuggers.");
     } else if (elementName == "copyGPUBuffersCheckBox") {
-        text = tr("Copy GPU Buffers:\\nGets around race conditions involving GPU submits.\\nMay or may not help with PM4 type 0 crashes.");
+        text = tr("Copy GPU Buffers:\\nCopy command buffers before submit. May help with PM4 type 0 crashes.");
     } else if (elementName == "collectShaderCheckBox") {
-        text = tr("Collect Shaders:\\nYou need this enabled to edit shaders with the debug menu (Ctrl + F10).");
+        text = tr("Collect Shaders:\\nNeeded to edit shaders in the debug menu (Ctrl+F10).");
     } else if (elementName == "micComboBox") {
-        text = tr("Microphone:\\nNone: Does not use the microphone.\\nDefault Device: Will use the default device defined in the system.\\nOr manually choose the microphone to be used from the list.");
+        text = tr("Microphone:\\nNone, the system default, or a specific device.");
     } else if (elementName == "volumeSliderElement") {
-        text = tr("Volume:\\nAdjust volume for games on a global level, range goes from 0-500% with the default being 100%.");
+        text = tr("Volume:\\nGlobal game volume, 0-500%. Default 100%.");
     } else if (elementName == "chooseHomeTabGroupBox") {
-        text = tr("Default tab when opening settings:\\nChoose which tab will open, the default is General.");
+        text = tr("Default Tab:\\nTab shown when settings open.");
     } else if (elementName == "motionControlsCheckBox") {
-        text = tr("Enable Motion Controls:\\nWhen enabled it will use the controller's motion control if supported.");
+        text = tr("Motion Controls:\\nUse the controller's gyro when available.");
     } else if (elementName == "usbComboBox") {
-        text = tr("USB Device:\\nReal USB Device: Use a real USB Device attached to the system.\\nSkylander Portal: Emulate a Skylander Portal of Power.\\nInfinity Base: Emulate a Disney Infinity Base.\\nDimensions Toypad: Emulate a Lego Dimensions Toypad.");
+        text = tr("USB Device:\\nA real USB device, or an emulated Skylanders Portal, Infinity Base or Dimensions Toypad.");
     }
 
     // Experimental
     if (elementName == "dmaCheckBox") {
-        text = tr("Enable Direct Memory Access:\\nEnables arbitrary memory access from the GPU to CPU memory.");
+        text = tr("Direct Memory Access:\\nLet the GPU read any CPU memory. Some games need it.");
     } else if (elementName == "neoCheckBox") {
-        text = tr("Enable PS4 Neo Mode:\\nAdds support for PS4 Pro emulation and memory size. Currently causes instability in a large number of tested games.");
+        text = tr("PS4 Pro Mode:\\nEmulate a PS4 Pro. Unstable in many games.");
     } else if (elementName == "devkitCheckBox") {
-        text = tr("Enable Devkit Console Mode:\\nAdds support for Devkit console memory size.");
+        text = tr("Devkit Mode:\\nEmulate devkit memory size.");
     } else if (elementName == "networkConnectedCheckBox") {
-        text = tr("Set Network Connected to True:\\nForces games to detect an active network connection. Actual online capabilities are not yet supported.");
+        text = tr("Report Network Connected:\\nGames see a network connection. Online play is not supported.");
     } else if (elementName == "shaderCaheCheckBox") {
-        text = tr("Enable Shader Cache:\\nStoring compiled shaders to avoid recompilations, reduce stuttering.");
+        text = tr("Shader Cache:\\nKeep compiled shaders on disk to reduce stutter.");
     } else if (elementName == "shaderCacheArchiveCheckBox") {
-        text = tr("Compress the Shader Cache files into a zip file:\\nThe shader cache files are stored within a single zip file instead of multiple separate files.");
+        text = tr("Compress Cache:\\nStore the shader cache in one zip file.");
     } else if (elementName == "shadnetCheckBox") {
-        text = tr("shadNet:\\nCompatibility is very limited at the moment.\\nYou can register at https://www.shadps4.net/shadnet/register/.");
+        text = tr("shadNet:\\nExperimental online service. Register at https://www.shadps4.net/shadnet/register/.");
     } else if (elementName == "readbacksGroupBox") {
-        text = tr("Readbacks:\\nEnable GPU memory readbacks and writebacks.\\nThis is required for proper behavior in some games.\\nMight cause stability and/or performance issues.");
+        text = tr("Readbacks:\\nCopy GPU writes back to memory. Some games need it; can cost performance.");
     } else if (elementName == "readbackLinearImagesCheckBox") {
-        text = tr("Enable Readback Linear Images:\\nEnables async downloading of GPU modified linear images.\\nMight fix issues in some games.");
+        text = tr("Linear Image Readback:\\nDownload GPU-written linear images. Fixes some games.");
     } else if (elementName == "dmemGroupBox") {
-        text = tr("Additional DMem Allocation:\\nForces allocation of the specified amount of additional DMem. Crashes or causes issues in some games.");
+        text = tr("Extra DMem:\\nAllocate additional direct memory. Can break some games.");
     }
 
     // clang-format on
@@ -1817,7 +1817,7 @@ void SettingsDialog::SetupGraphicsExtras() {
             });
 
     // Frame generation; its in-game toggle key is set in the Hotkeys dialog.
-    frameGenCheckBox = new QCheckBox(tr("Enable Frame Generation"), ui->FSRGroupBox);
+    frameGenCheckBox = new QCheckBox(tr("Frame Generation"), ui->FSRGroupBox);
     frameGenCheckBox->setObjectName("frameGenCheckBox");
     ui->verticalLayout_5->insertWidget(0, frameGenCheckBox);
 
@@ -1856,7 +1856,7 @@ void SettingsDialog::SetupGraphicsExtras() {
     imageQualityGroupBox->setObjectName("imageQualityGroupBox");
     auto* imageQualityLayout = new QVBoxLayout(imageQualityGroupBox);
 
-    antiAliasingCheckBox = new QCheckBox(tr("Enable Anti-Aliasing (FXAA)"), imageQualityGroupBox);
+    antiAliasingCheckBox = new QCheckBox(tr("FXAA Anti-Aliasing"), imageQualityGroupBox);
     antiAliasingCheckBox->setObjectName("antiAliasingCheckBox");
     imageQualityLayout->addWidget(antiAliasingCheckBox);
 
@@ -1928,7 +1928,7 @@ void SettingsDialog::SetupGraphicsExtras() {
     dlss5GroupBox->setObjectName("dlss5GroupBox");
     auto* dlss5Layout = new QVBoxLayout(dlss5GroupBox);
 
-    dlss5CheckBox = new QCheckBox(tr("Enable DLSS5 (Neural Rendering)"), dlss5GroupBox);
+    dlss5CheckBox = new QCheckBox(tr("DLSS5 Neural Rendering"), dlss5GroupBox);
     dlss5CheckBox->setObjectName("dlss5CheckBox");
     dlss5CheckBox->setToolTip(
         tr("Runs NVIDIA's DLSS5 neural renderer on the game picture inside the emulator, in a "
