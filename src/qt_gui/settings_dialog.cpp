@@ -12,6 +12,12 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QHeaderView>
+#include <QListWidget>
+#include <QPainter>
+#include <QScrollArea>
+#include <QStyle>
+#include <QTabBar>
+#include <QTimer>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -178,6 +184,7 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
 #ifndef _WIN32
     ui->redZoneGroupBox->setVisible(false);
 #endif
+    SetupNavigation();
 
     ui->buttonBox->button(QDialogButtonBox::StandardButton::Close)->setFocus();
 
@@ -1672,6 +1679,168 @@ QComboBox* MakeLogLevelBox(QWidget* parent, const QString& emptyName) {
 }
 } // namespace
 
+void SettingsDialog::SetupNavigation() {
+    struct Page {
+        const char* icon;
+        QString subtitle;
+    };
+    const std::array<Page, 10> pages{{
+        {":/images/settings_icon.png", tr("Console, audio and CPU")},
+        {":/images/themes_icon.png", tr("Launcher look, updates and compatibility")},
+        {":/images/fullscreen_icon.png", tr("Display, upscaling, frame generation and DLSS5")},
+        {":/images/users.png", tr("Profiles and trophies")},
+        {":/images/controller_icon.png", tr("Controllers, cursor, camera and USB devices")},
+        {":/images/website.png", tr("Online services and connection")},
+        {":/images/folder_icon.png", tr("Games, DLC, saves and system files")},
+        {":/images/list_icon.png", tr("Log output and per-class log levels")},
+        {":/images/utils_icon.png", tr("Validation, markers and dumps for troubleshooting")},
+        {":/images/dump_icon.png", tr("Memory, readbacks and shader cache")},
+    }};
+
+    auto* tabs = ui->tabWidgetSettings;
+    tabs->tabBar()->hide();
+    tabs->setDocumentMode(true);
+
+    auto* nav = new QListWidget(this);
+    nav->setObjectName("settingsNav");
+    nav->setIconSize(QSize(20, 20));
+    nav->setFixedWidth(210);
+    nav->setFrameShape(QFrame::NoFrame);
+    nav->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    for (int i = 0; i < tabs->count(); ++i) {
+        QPixmap icon(pages[i].icon);
+        QPainter painter(&icon);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(icon.rect(), palette().color(QPalette::WindowText));
+        painter.end();
+        auto* item = new QListWidgetItem(QIcon(icon), tabs->tabText(i), nav);
+        item->setSizeHint(QSize(0, 40));
+        item->setHidden(!tabs->isTabVisible(i));
+    }
+
+    auto* search = new QLineEdit(this);
+    search->setObjectName("settingsSearch");
+    search->setPlaceholderText(tr("Search settings"));
+    search->setClearButtonEnabled(true);
+
+    auto* sidebar = new QVBoxLayout;
+    sidebar->setSpacing(10);
+    sidebar->addWidget(search);
+    sidebar->addWidget(nav, 1);
+
+    auto* title = new QLabel(this);
+    title->setObjectName("settingsPageTitle");
+    auto* subtitle = new QLabel(this);
+    subtitle->setObjectName("settingsPageSubtitle");
+
+    auto* root = static_cast<QVBoxLayout*>(layout());
+    root->removeWidget(tabs);
+    root->removeWidget(ui->buttonBox);
+    root->removeWidget(ui->descriptionText);
+
+    ui->descriptionText->setFixedHeight(84);
+    ui->descriptionText->setFrameShape(QFrame::NoFrame);
+    ui->descriptionText->setObjectName("descriptionText");
+
+    auto* content = new QVBoxLayout;
+    content->setSpacing(6);
+    content->addWidget(title);
+    content->addWidget(subtitle);
+    content->addSpacing(6);
+    content->addWidget(tabs, 1);
+    content->addWidget(ui->descriptionText);
+
+    auto* body = new QHBoxLayout;
+    body->setSpacing(18);
+    body->addLayout(sidebar);
+    body->addLayout(content, 1);
+    root->addLayout(body, 1);
+    root->addWidget(ui->buttonBox);
+    root->setContentsMargins(16, 16, 16, 12);
+
+    const auto showPage = [=](int index) {
+        if (index < 0) {
+            return;
+        }
+        title->setText(tabs->tabText(index));
+        subtitle->setText(pages[index].subtitle);
+    };
+    connect(nav, &QListWidget::currentRowChanged, tabs, &QTabWidget::setCurrentIndex);
+    connect(tabs, &QTabWidget::currentChanged, this, [=](int index) {
+        nav->setCurrentRow(index);
+        showPage(index);
+    });
+    nav->setCurrentRow(tabs->currentIndex());
+    showPage(tabs->currentIndex());
+
+    auto* searchTimer = new QTimer(this);
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(250);
+    connect(search, &QLineEdit::textChanged, searchTimer, qOverload<>(&QTimer::start));
+    connect(searchTimer, &QTimer::timeout, this, [=] {
+        const QString query = search->text().trimmed();
+        int firstMatch = -1;
+        for (int i = 0; i < tabs->count(); ++i) {
+            bool pageMatches = query.isEmpty();
+            for (QWidget* widget : tabs->widget(i)->findChildren<QWidget*>()) {
+                QString label;
+                if (auto* button = qobject_cast<QAbstractButton*>(widget)) {
+                    label = button->text();
+                } else if (auto* group = qobject_cast<QGroupBox*>(widget)) {
+                    label = group->title();
+                } else if (auto* textLabel = qobject_cast<QLabel*>(widget)) {
+                    label = textLabel->text();
+                } else {
+                    continue;
+                }
+                const bool matches = !query.isEmpty() && label.contains(query, Qt::CaseInsensitive);
+                if (widget->property("searchMatch").toBool() != matches) {
+                    widget->setProperty("searchMatch", matches);
+                    widget->style()->unpolish(widget);
+                    widget->style()->polish(widget);
+                }
+                pageMatches |= matches;
+            }
+            pageMatches |= tabs->tabText(i).contains(query, Qt::CaseInsensitive);
+            nav->item(i)->setHidden(!tabs->isTabVisible(i) || !pageMatches);
+            if (pageMatches && tabs->isTabVisible(i) && firstMatch < 0) {
+                firstMatch = i;
+            }
+        }
+        if (firstMatch >= 0 && nav->item(tabs->currentIndex())->isHidden()) {
+            tabs->setCurrentIndex(firstMatch);
+        }
+    });
+
+    ui->buttonBox->button(QDialogButtonBox::Save)->setObjectName("primaryButton");
+    setStyleSheet(R"(
+        #settingsNav { background: transparent; outline: 0; }
+        #settingsNav::item { border-radius: 8px; padding: 4px 10px; margin: 1px 0; }
+        #settingsNav::item:hover { background: palette(midlight); }
+        #settingsNav::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+        #settingsSearch { border: 1px solid palette(mid); border-radius: 8px; padding: 6px 10px; }
+        #settingsSearch:focus { border-color: palette(highlight); }
+        #settingsPageTitle { font-size: 20pt; font-weight: 600; }
+        #settingsPageSubtitle { color: palette(placeholder-text); }
+        QTabWidget::pane { border: none; }
+        QScrollArea { background: transparent; border: none; }
+        QGroupBox { border: 1px solid palette(mid); border-radius: 10px; margin-top: 14px;
+                    padding: 10px 10px 8px 10px; font-weight: 600; }
+        QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
+        QGroupBox > QWidget, QGroupBox QCheckBox, QGroupBox QComboBox, QGroupBox QLabel,
+        QGroupBox QLineEdit, QGroupBox QPushButton, QGroupBox QSpinBox { font-weight: normal; }
+        [searchMatch="true"] { color: palette(highlight); font-weight: 700; }
+        #descriptionText { border: 1px solid palette(mid); border-radius: 10px; padding: 6px 10px;
+                           background: palette(alternate-base); }
+        QDialogButtonBox QPushButton { min-width: 96px; padding: 6px 14px; border-radius: 8px;
+                                       border: 1px solid palette(mid); background: palette(button); }
+        QDialogButtonBox QPushButton:hover { border-color: palette(highlight); }
+        #primaryButton { background: palette(highlight); color: palette(highlighted-text);
+                         border: none; }
+    )");
+    resize(std::max(width(), 1120), std::max(height(), 800));
+}
+
 void SettingsDialog::SetupLogLevels() {
     auto* group = new QGroupBox(tr("Log Levels"), ui->logFilter->parentWidget());
     group->setObjectName("logLevelsGroupBox");
@@ -2004,7 +2173,6 @@ void SettingsDialog::LoadDlss5Settings() {
         box->setCurrentIndex(index >= 0 ? index : 0);
     };
     const auto setSlider = [](QSlider* slider, double value, double min, double max) {
-        QSignalBlocker blocker(slider);
         slider->setValue(qRound(qBound(min, value, max) * 100.0));
     };
 

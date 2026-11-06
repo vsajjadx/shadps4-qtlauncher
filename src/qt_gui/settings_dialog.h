@@ -58,6 +58,7 @@ private:
     void RefreshAudioDevices();
     void SetupGraphicsExtras();
     void SetupLogLevels();
+    void SetupNavigation();
     void SyncLogLevelsFromFilter();
     void WriteFilterFromLogLevels();
     void SyncResolutionComboBox();
