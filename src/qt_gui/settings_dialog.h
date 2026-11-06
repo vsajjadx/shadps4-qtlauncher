@@ -84,16 +84,13 @@ private:
     QSlider* contrastSlider{};
     QGroupBox* imageQualityGroupBox{};
 
-    // DLSS5 (NeuralScreen) group; options are stored in the emulator's
-    // user/neural_screen.json so they survive emulator updates.
+    // DLSS5 (Magpie DLSS5-RTX30) group; options are stored in the emulator's
+    // user/dlss5.json so they survive emulator updates.
     QGroupBox* dlss5GroupBox{};
     QCheckBox* dlss5CheckBox{};
     QCheckBox* dlss5BoostCheckBox{};
-    QCheckBox* dlss5AutoQualityCheckBox{};
     QComboBox* dlss5ResolutionComboBox{};
-    QComboBox* dlss5PassesComboBox{};
-    QComboBox* dlss5ProfileComboBox{};
-    QComboBox* dlss5ModelComboBox{};
+    QComboBox* dlss5StyleComboBox{};
     QSlider* dlss5IntensitySlider{};
     QSlider* dlss5LocalToneSlider{};
     QSlider* dlss5LocalStructureSlider{};
