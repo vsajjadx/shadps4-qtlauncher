@@ -11,6 +11,7 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileDialog>
+#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -20,6 +21,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QTableWidget>
 #include <SDL3/SDL.h>
 #include <fmt/format.h>
 
@@ -144,6 +146,7 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
     ui->setupUi(this);
     ui->tabWidgetSettings->setUsesScrollButtons(false);
     SetupGraphicsExtras();
+    SetupLogLevels();
     GetPhysicalDevices();
 
     initialHeight = this->height();
@@ -586,7 +589,6 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
         contrastSlider->installEventFilter(this);
         ui->presentModeGroupBox->installEventFilter(this);
         ui->heightDivider->installEventFilter(this);
-        ui->nullGpuCheckBox->installEventFilter(this);
         ui->enableHDRCheckBox->installEventFilter(this);
         ui->chooseHomeTabGroupBox->installEventFilter(this);
 
@@ -792,7 +794,6 @@ void SettingsDialog::LoadValuesFromConfig() {
     QString translatedText_PresentMode = presentModeMap.key(QString::fromStdString(presentMode));
     ui->presentModeComboBox->setCurrentText(translatedText_PresentMode);
 
-    ui->nullGpuCheckBox->setChecked(EmulatorSettings.IsNullGPU());
     ui->widthSpinBox->setValue(EmulatorSettings.GetWindowWidth());
     ui->heightSpinBox->setValue(EmulatorSettings.GetWindowHeight());
     ui->enableHDRCheckBox->setChecked(EmulatorSettings.IsHdrAllowed());
@@ -858,6 +859,9 @@ void SettingsDialog::LoadValuesFromConfig() {
     ui->logAppendCheckBox->setChecked(EmulatorSettings.IsLogAppend());
     ui->logEnableCheckBox->setChecked(EmulatorSettings.IsLogEnable());
     ui->logFilterLineEdit->setText(QString::fromStdString(EmulatorSettings.GetLogFilter()));
+    SyncLogLevelsFromFilter();
+    logFlushLevelBox->setCurrentIndex(std::max(
+        0, logFlushLevelBox->findData(QString::fromStdString(EmulatorSettings.GetLogFlushLevel()))));
     ui->logMaxSkipDurationLineEdit->setValue(EmulatorSettings.GetLogMaxSkipDuration());
     ui->logSeparateCheckBox->setChecked(EmulatorSettings.IsLogSeparate());
     ui->logSizeLimitLineEdit->setValue(EmulatorSettings.GetLogSizeLimit());
@@ -1096,8 +1100,6 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
         text = tr("Vblank Frequency:\\nThe frame rate at which the emulator refreshes at (60hz is the baseline, whether the game runs at 30 or 60fps). Changing this may have adverse effects, such as increasing the game speed, or breaking critical game functionality that does not expect this to change!");
     } else if (elementName == "dumpShadersCheckBox") {
         text = tr("Enable Shaders Dumping:\\nFor the sake of technical debugging, saves the game's shaders to a folder as they render.");
-    } else if (elementName == "nullGpuCheckBox") {
-        text = tr("Enable Null GPU:\\nFor the sake of technical debugging, disables game rendering as if there were no graphics card. The screen will be black.");
     }
 
     // Path
@@ -1241,7 +1243,7 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
 
     // Graphics tab
     EmulatorSettings.SetGpuId(ui->graphicsAdapterBox->currentIndex() - 1, is_specific);
-    EmulatorSettings.SetNullGPU(ui->nullGpuCheckBox->isChecked(), is_specific);
+    EmulatorSettings.SetNullGPU(false, is_specific);
 
     EmulatorSettings.SetFullScreen(
         screenModeMap.value(ui->displayModeComboBox->currentText()) != "Windowed", is_specific);
@@ -1313,6 +1315,8 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
     EmulatorSettings.SetLogAppend(ui->logAppendCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetLogEnable(ui->logEnableCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetLogFilter(ui->logFilterLineEdit->text().toStdString(), is_specific);
+    EmulatorSettings.SetLogFlushLevel(logFlushLevelBox->currentData().toString().toStdString(),
+                                      is_specific);
     EmulatorSettings.SetLogMaxSkipDuration(ui->logMaxSkipDurationLineEdit->value(), is_specific);
     EmulatorSettings.SetLogSeparate(ui->logSeparateCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetLogSizeLimit(ui->logSizeLimitLineEdit->value(), is_specific);
@@ -1628,6 +1632,142 @@ void SettingsDialog::GetPhysicalDevices() {
     std::string gpuName = GetAppleGpuName();
     m_physical_devices.push_back(QString::fromStdString(gpuName));
 #endif
+}
+
+namespace {
+constexpr std::array<const char*, 116> LogClassNames{
+    "Log", "Common", "Common.Filesystem", "Common.Memory", "KeyManager", "Core", "Core.Linker",
+    "Core.Devices", "Config", "Debug", "Kernel", "Kernel.Pthread", "Kernel.Fs", "Kernel.Vmm",
+    "Kernel.Event", "Kernel.Sce", "Lib", "Lib.LibcInternal", "Lib.Kernel", "Lib.Pad",
+    "Lib.SystemGesture", "Lib.GnmDriver", "Lib.SystemService", "Lib.UserService", "Lib.VideoOut",
+    "Lib.CommonDlg", "Lib.MsgDlg", "Lib.AudioOut", "Lib.AudioIn", "Lib.Move", "Lib.Net",
+    "Lib.NetCtl", "Lib.SaveData", "Lib.SaveDataDialog", "Lib.Ssl", "Lib.Ssl2", "Lib.Http",
+    "Lib.Http2", "Lib.SysModule", "Lib.NpCommon", "Lib.NpCommerce", "Lib.NpAuth", "Lib.NpManager",
+    "Lib.NpMatching2", "Lib.NpSignaling", "Lib.NpScore", "Lib.NpTrophy", "Lib.NpTus",
+    "Lib.NpUtility", "Lib.NpWebApi", "Lib.NpWebApi2", "Lib.NpProfileDialog",
+    "Lib.NpSnsFacebookDialog", "Lib.Screenshot", "Lib.AppContent", "Lib.Rtc", "Lib.Rudp",
+    "Lib.DiscMap", "Lib.Png", "Lib.Jpeg", "Lib.PlayGo", "Lib.PlayGoDialog", "Lib.Random",
+    "Lib.Usbd", "Lib.Ajm", "Lib.ErrorDialog", "Lib.ImeDialog", "Lib.InvitationDialog",
+    "Lib.AvPlayer", "Lib.Ngs2", "Lib.Audio3d", "Lib.Ime", "Lib.GameLiveStreaming",
+    "Lib.Remoteplay", "Lib.SharePlay", "Lib.Fiber", "Lib.Vdec2", "Lib.Vdecsw", "Lib.Videodec",
+    "Lib.VideoRecording", "Lib.Voice", "Lib.RazorCpu", "Lib.Mouse", "Lib.Keyboard",
+    "Lib.WebBrowserDialog", "Lib.NpParty", "Lib.NpPartner", "Lib.Zlib", "Lib.Hmd",
+    "Lib.HmdSetupDialog", "Lib.SigninDialog", "Lib.Camera", "Lib.CompanionHttpd",
+    "Lib.CompanionUtil", "Lib.ContentExport", "Lib.VrTracker", "Lib.Font", "Lib.FontFt",
+    "Frontend", "NpHandler", "Render", "Render.Vulkan", "Render.Recompiler", "ShadNet", "ImGui",
+    "Loader", "Input", "Tty",
+};
+constexpr std::array<const char*, 7> LogLevelNames{"trace", "debug",    "info", "warning",
+                                                   "error", "critical", "off"};
+
+QComboBox* MakeLogLevelBox(QWidget* parent, const QString& emptyName) {
+    auto* box = new QComboBox(parent);
+    if (!emptyName.isEmpty()) {
+        box->addItem(emptyName, QString());
+    }
+    for (const char* level : LogLevelNames) {
+        box->addItem(level, QString(level));
+    }
+    return box;
+}
+} // namespace
+
+void SettingsDialog::SetupLogLevels() {
+    auto* group = new QGroupBox(tr("Log Levels"), ui->logFilter->parentWidget());
+    group->setObjectName("logLevelsGroupBox");
+    auto* layout = new QVBoxLayout(group);
+
+    auto* levelsRow = new QHBoxLayout;
+    levelsRow->addWidget(new QLabel(tr("All classes:"), group));
+    logDefaultLevelBox = MakeLogLevelBox(group, {});
+    levelsRow->addWidget(logDefaultLevelBox);
+    levelsRow->addWidget(new QLabel(tr("Flush at:"), group));
+    logFlushLevelBox = MakeLogLevelBox(group, tr("default"));
+    levelsRow->addWidget(logFlushLevelBox);
+    layout->addLayout(levelsRow);
+
+    auto* searchEdit = new QLineEdit(group);
+    searchEdit->setPlaceholderText(tr("Search classes..."));
+    searchEdit->setClearButtonEnabled(true);
+    layout->addWidget(searchEdit);
+
+    logClassTable = new QTableWidget(static_cast<int>(LogClassNames.size()), 2, group);
+    logClassTable->setHorizontalHeaderLabels({tr("Class"), tr("Level")});
+    logClassTable->verticalHeader()->setVisible(false);
+    logClassTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    logClassTable->setSelectionMode(QAbstractItemView::NoSelection);
+    logClassTable->setMinimumHeight(240);
+    for (int row = 0; row < static_cast<int>(LogClassNames.size()); ++row) {
+        auto* nameItem = new QTableWidgetItem(LogClassNames[row]);
+        nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
+        logClassTable->setItem(row, 0, nameItem);
+        auto* levelBox = MakeLogLevelBox(logClassTable, tr("default"));
+        connect(levelBox, &QComboBox::currentIndexChanged, this,
+                [this] { WriteFilterFromLogLevels(); });
+        logClassTable->setCellWidget(row, 1, levelBox);
+    }
+    layout->addWidget(logClassTable);
+
+    connect(searchEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
+        for (int row = 0; row < logClassTable->rowCount(); ++row) {
+            logClassTable->setRowHidden(
+                row, !logClassTable->item(row, 0)->text().contains(text, Qt::CaseInsensitive));
+        }
+    });
+    connect(logDefaultLevelBox, &QComboBox::currentIndexChanged, this,
+            [this] { WriteFilterFromLogLevels(); });
+    connect(ui->logFilterLineEdit, &QLineEdit::textChanged, this,
+            [this] { SyncLogLevelsFromFilter(); });
+
+    ui->verticalLayout_15->insertWidget(1, group);
+}
+
+void SettingsDialog::SyncLogLevelsFromFilter() {
+    if (syncingLogLevels) {
+        return;
+    }
+    syncingLogLevels = true;
+    QString defaultLevel = "info";
+    QMap<QString, QString> classLevels;
+    extraLogFilter.clear();
+    for (const QString& entry : ui->logFilterLineEdit->text().split(' ', Qt::SkipEmptyParts)) {
+        const QStringList pair = entry.split(':');
+        const bool knownClass =
+            pair.size() == 2 &&
+            std::ranges::any_of(LogClassNames, [&](const char* name) { return pair[0] == name; });
+        if (pair.size() == 2 && pair[0] == "*") {
+            defaultLevel = pair[1];
+        } else if (knownClass) {
+            classLevels[pair[0]] = pair[1];
+        } else {
+            extraLogFilter.push_back(entry);
+        }
+    }
+    logDefaultLevelBox->setCurrentIndex(std::max(0, logDefaultLevelBox->findData(defaultLevel)));
+    for (int row = 0; row < logClassTable->rowCount(); ++row) {
+        auto* levelBox = static_cast<QComboBox*>(logClassTable->cellWidget(row, 1));
+        const QString level = classLevels.value(logClassTable->item(row, 0)->text());
+        levelBox->setCurrentIndex(std::max(0, levelBox->findData(level)));
+    }
+    syncingLogLevels = false;
+}
+
+void SettingsDialog::WriteFilterFromLogLevels() {
+    if (syncingLogLevels) {
+        return;
+    }
+    QStringList entries{"*:" + logDefaultLevelBox->currentData().toString()};
+    for (int row = 0; row < logClassTable->rowCount(); ++row) {
+        const QString level =
+            static_cast<QComboBox*>(logClassTable->cellWidget(row, 1))->currentData().toString();
+        if (!level.isEmpty()) {
+            entries.push_back(logClassTable->item(row, 0)->text() + ":" + level);
+        }
+    }
+    entries.append(extraLogFilter);
+    syncingLogLevels = true;
+    ui->logFilterLineEdit->setText(entries.join(' '));
+    syncingLogLevels = false;
 }
 
 void SettingsDialog::SetupGraphicsExtras() {

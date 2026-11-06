@@ -34,6 +34,30 @@ inline void SplitEntry(const QString& entry, QString& comment, QString& filter) 
         filter = entry.mid(idx + 1);
     }
 }
+constexpr std::pair<const char*, const char*> BuiltInPresets[] = {
+    {"Default", "*:info"},
+    {"Errors only", "*:error"},
+    {"Game output only", "*:warning Tty:info"},
+    {"Graphics", "*:info Render:debug Render.Vulkan:debug Lib.GnmDriver:debug Lib.VideoOut:debug"},
+    {"Shader recompiler", "*:info Render.Recompiler:trace"},
+    {"Input", "*:info Input:debug Lib.Pad:debug Lib.Mouse:debug Lib.Keyboard:debug Lib.Move:debug"},
+    {"Audio", "*:info Lib.AudioOut:debug Lib.AudioIn:debug Lib.Ajm:debug Lib.Ngs2:debug "
+              "Lib.Audio3d:debug"},
+    {"Video playback", "*:info Lib.AvPlayer:debug Lib.Videodec:debug Lib.Vdec2:debug"},
+    {"Kernel and memory", "*:info Kernel:debug Kernel.Vmm:debug Kernel.Pthread:debug "
+                          "Kernel.Event:debug Lib.Kernel:debug Common.Memory:debug"},
+    {"Files and saves", "*:info Kernel.Fs:debug Common.Filesystem:debug Lib.SaveData:debug "
+                        "Lib.SaveDataDialog:debug Lib.AppContent:debug Lib.PlayGo:debug"},
+    {"Loader and modules", "*:info Loader:debug Core.Linker:debug Lib.SysModule:debug"},
+    {"Network and PSN", "*:info Lib.Net:debug Lib.NetCtl:debug Lib.Http:debug Lib.Http2:debug "
+                        "Lib.Ssl:debug Lib.Ssl2:debug Lib.NpManager:debug Lib.NpWebApi:debug "
+                        "Lib.NpWebApi2:debug ShadNet:debug NpHandler:debug"},
+    {"Dialogs and system UI", "*:info Lib.CommonDlg:debug Lib.MsgDlg:debug Lib.ImeDialog:debug "
+                              "Lib.Ime:debug Lib.ErrorDialog:debug Lib.SystemService:debug "
+                              "Lib.UserService:debug"},
+    {"Trophies", "*:info Lib.NpTrophy:debug"},
+    {"Everything (slow)", "*:trace"},
+};
 } // namespace
 
 LogPresetsDialog::LogPresetsDialog(std::shared_ptr<gui_settings> gui_settings, QWidget* parent)
@@ -198,6 +222,12 @@ void LogPresetsDialog::LoadFromSettings() {
     QList<QString> list;
     if (var.isValid()) {
         list = m_gui_settings->Var2List(var);
+    }
+    for (const auto& [comment, filter] : BuiltInPresets) {
+        const QString entry = MakeEntry(comment, filter);
+        if (!list.contains(entry)) {
+            list.push_back(entry);
+        }
     }
     PopulateFromList(list);
 }

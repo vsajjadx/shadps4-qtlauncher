@@ -11,6 +11,7 @@
 #include <QGroupBox>
 #include <QPushButton>
 #include <QSlider>
+#include <QTableWidget>
 
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -56,6 +57,9 @@ private:
     void SaveSettings();
     void RefreshAudioDevices();
     void SetupGraphicsExtras();
+    void SetupLogLevels();
+    void SyncLogLevelsFromFilter();
+    void WriteFilterFromLogLevels();
     void SyncResolutionComboBox();
     void SyncImageQualityComboBoxes();
 
@@ -81,6 +85,11 @@ private:
     QComboBox* resolutionScaleComboBox{};
     QComboBox* anisotropicComboBox{};
     QSlider* brightnessSlider{};
+    QComboBox* logDefaultLevelBox{};
+    QComboBox* logFlushLevelBox{};
+    QTableWidget* logClassTable{};
+    QStringList extraLogFilter;
+    bool syncingLogLevels = false;
     QSlider* contrastSlider{};
     QGroupBox* imageQualityGroupBox{};
 

@@ -947,13 +947,6 @@
                <item>
                 <widget class="QComboBox" name="graphicsAdapterBox"/>
                </item>
-               <item>
-                <widget class="QCheckBox" name="nullGpuCheckBox">
-                 <property name="text">
-                  <string>Enable NULL GPU</string>
-                 </property>
-                </widget>
-               </item>
               </layout>
              </widget>
             </item>
