@@ -2158,10 +2158,9 @@ void SettingsDialog::SetupGraphicsExtras() {
 
     addDlss5SliderRow(fineTuneLayout, tr("Global Tone:"), dlss5GlobalToneSlider, 0, 200, 100);
     addDlss5SliderRow(fineTuneLayout, tr("Local Tone:"), dlss5LocalToneSlider, 0, 200, 0);
-    addDlss5SliderRow(fineTuneLayout, tr("Local Structure:"), dlss5LocalStructureSlider, 0, 200,
-                      100);
+    addDlss5SliderRow(fineTuneLayout, tr("Local Structure:"), dlss5LocalStructureSlider, 0, 200, 0);
     addDlss5SliderRow(fineTuneLayout, tr("Skin Structure:"), dlss5SkinStructureSlider, -100, 250,
-                      100);
+                      0);
     dlss5Layout->addWidget(fineTuneBox);
 
     ui->graphicsTabLayoutLeft->insertWidget(
@@ -2191,8 +2190,8 @@ void SettingsDialog::LoadDlss5Settings() {
     setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
     setSlider(dlss5GlobalToneSlider, j.value("GlobalTone").toDouble(1.0), 0.0, 2.0);
     setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(0.0), 0.0, 2.0);
-    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(1.0), -1.0, 2.5);
+    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(0.0), 0.0, 2.0);
+    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(0.0), -1.0, 2.5);
 }
 
 void SettingsDialog::SaveDlss5Settings() {
