@@ -88,10 +88,9 @@ private:
     // user/dlss5.json so they survive emulator updates.
     QGroupBox* dlss5GroupBox{};
     QCheckBox* dlss5CheckBox{};
-    QCheckBox* dlss5BoostCheckBox{};
-    QComboBox* dlss5ResolutionComboBox{};
     QComboBox* dlss5StyleComboBox{};
     QSlider* dlss5IntensitySlider{};
+    QSlider* dlss5GlobalToneSlider{};
     QSlider* dlss5LocalToneSlider{};
     QSlider* dlss5LocalStructureSlider{};
     QSlider* dlss5SkinStructureSlider{};

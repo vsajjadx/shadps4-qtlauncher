@@ -1083,15 +1083,15 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
     } else if (elementName == "anisotropicComboBox") {
         text = tr("Anisotropic Filtering:\\nMakes textures sharper on surfaces seen at a steep angle, such as roads and floors. Higher values look better and cost a little GPU time. Off leaves it as the game sets it.");
     } else if (elementName == "frameGenBackendComboBox") {
-        text = tr("Frame Generation Method:\\nFSR 3.1: AMD FidelityFX frame generation, Windows builds only.\\nLemon FG: a light frame generator that works on any GPU with subgroup support. It only looks at the finished picture, so small fast objects can smear and see-through HUD over a moving scene can be dragged along.\\nBoth add one generated frame between every two game frames. The in-game key that turns frame generation on and off is set in Hotkeys (default: 1) and drives the method chosen here.");
+        text = tr("Frame Generation Method:\\nFSR 3.1: AMD FidelityFX frame generation, Windows builds only.\\nMulti FG: a light frame generator that works on any GPU with subgroup support. It only looks at the finished picture, so small fast objects can smear and see-through HUD over a moving scene can be dragged along.\\nBoth add one generated frame between every two game frames. The in-game key that turns frame generation on and off is set in Hotkeys (default: 1) and drives the method chosen here.");
     } else if (elementName == "lemonFgHighQualityCheckBox") {
-        text = tr("Lemon FG: High Quality:\\nSearches motion at half the window resolution instead of a quarter. Small and fast moving objects follow their motion better and smear less, at about four times the cost of the motion search. Turn it off if frame generation makes the game slower.");
+        text = tr("Multi FG: High Quality:\\nSearches motion at half the window resolution instead of a quarter. Small and fast moving objects follow their motion better and smear less, at about four times the cost of the motion search. Turn it off if frame generation makes the game slower.");
     } else if (elementName == "lemonFgHudProtectionCheckBox") {
-        text = tr("Lemon FG: HUD Protection:\\nKeeps what does not move on screen, such as the HUD, health bars and subtitles, in place in the generated frames instead of dragging it along with the moving scene. Turn it off if parts of a moving scene look frozen or doubled in a game with film grain or a constantly animated HUD.");
+        text = tr("Multi FG: HUD Protection:\\nKeeps what does not move on screen, such as the HUD, health bars and subtitles, in place in the generated frames instead of dragging it along with the moving scene. Turn it off if parts of a moving scene look frozen or doubled in a game with film grain or a constantly animated HUD.");
     } else if (elementName == "lemonFgMultiplierComboBox") {
-        text = tr("Lemon FG: Multiplier:\\nHow many frames are shown for every game frame. 2x adds one generated frame, 3x two, 4x three and 6x five. A 30 FPS game shows 60, 90, 120 or 180 frames per second, so pick a multiplier your monitor's refresh rate can show. Higher multipliers use more video memory and GPU time, and the generated frames' mistakes are easier to see.");
+        text = tr("Multi FG: Multiplier:\\nHow many frames are shown for every game frame. 2x adds one generated frame, 3x two, 4x three and 6x five. A 30 FPS game shows 60, 90, 120 or 180 frames per second, so pick a multiplier your monitor's refresh rate can show. Higher multipliers use more video memory and GPU time, and the generated frames' mistakes are easier to see.");
     } else if (elementName == "frameGenCheckBox") {
-        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with the method chosen below (FSR 3.1 or Lemon FG), so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
+        text = tr("Enable Frame Generation:\\nAdds a generated frame between every two game frames with the method chosen below (FSR 3.1 or Multi FG), so the game looks smoother.\\nWorks best when the game already runs at 30 FPS or more. The key that turns it on and off while playing is set in Hotkeys (default: 1).");
     } else if (elementName == "heightDivider") {
         text = tr("Vblank Frequency:\\nThe frame rate at which the emulator refreshes at (60hz is the baseline, whether the game runs at 30 or 60fps). Changing this may have adverse effects, such as increasing the game speed, or breaking critical game functionality that does not expect this to change!");
     } else if (elementName == "dumpShadersCheckBox") {
@@ -1684,21 +1684,21 @@ void SettingsDialog::SetupGraphicsExtras() {
     frameGenBackendComboBox = new QComboBox(ui->FSRGroupBox);
     frameGenBackendComboBox->setObjectName("frameGenBackendComboBox");
     frameGenBackendComboBox->addItem(tr("FSR 3.1"), QStringLiteral("FSR"));
-    frameGenBackendComboBox->addItem(tr("Lemon FG"), QStringLiteral("Lemon"));
+    frameGenBackendComboBox->addItem(tr("Multi FG"), QStringLiteral("Lemon"));
     ui->verticalLayout_5->insertWidget(1, frameGenBackendComboBox);
 
-    lemonFgHighQualityCheckBox = new QCheckBox(tr("Lemon FG: High Quality"), ui->FSRGroupBox);
+    lemonFgHighQualityCheckBox = new QCheckBox(tr("Multi FG: High Quality"), ui->FSRGroupBox);
     lemonFgHighQualityCheckBox->setObjectName("lemonFgHighQualityCheckBox");
     ui->verticalLayout_5->insertWidget(2, lemonFgHighQualityCheckBox);
 
-    lemonFgHudProtectionCheckBox = new QCheckBox(tr("Lemon FG: HUD Protection"), ui->FSRGroupBox);
+    lemonFgHudProtectionCheckBox = new QCheckBox(tr("Multi FG: HUD Protection"), ui->FSRGroupBox);
     lemonFgHudProtectionCheckBox->setObjectName("lemonFgHudProtectionCheckBox");
     ui->verticalLayout_5->insertWidget(3, lemonFgHudProtectionCheckBox);
 
     lemonFgMultiplierComboBox = new QComboBox(ui->FSRGroupBox);
     lemonFgMultiplierComboBox->setObjectName("lemonFgMultiplierComboBox");
     for (const uint multiplier : {2u, 3u, 4u, 6u}) {
-        lemonFgMultiplierComboBox->addItem(tr("Lemon FG: %1x").arg(multiplier), multiplier);
+        lemonFgMultiplierComboBox->addItem(tr("Multi FG: %1x").arg(multiplier), multiplier);
     }
     ui->verticalLayout_5->insertWidget(4, lemonFgMultiplierComboBox);
 
@@ -1782,26 +1782,19 @@ void SettingsDialog::SetupGraphicsExtras() {
     ui->graphicsTabLayoutRight->insertWidget(
         ui->graphicsTabLayoutRight->indexOf(ui->FSRGroupBox) + 1, imageQualityGroupBox);
 
-    // DLSS5 (the Magpie build of DLSS5-RTX30); the options live in the emulator's
-    // user/dlss5.json and are applied when a game starts.
-    dlss5GroupBox = new QGroupBox(tr("DLSS5 (RTX 30)"), this);
+    // DLSS5, which the emulator's renderer runs on the game picture; the options live in the
+    // emulator's user/dlss5.json and are applied when a game starts.
+    dlss5GroupBox = new QGroupBox(tr("DLSS5"), this);
     dlss5GroupBox->setObjectName("dlss5GroupBox");
     auto* dlss5Layout = new QVBoxLayout(dlss5GroupBox);
 
     dlss5CheckBox = new QCheckBox(tr("Enable DLSS5 (Neural Rendering)"), dlss5GroupBox);
     dlss5CheckBox->setObjectName("dlss5CheckBox");
     dlss5CheckBox->setToolTip(
-        tr("Runs NVIDIA's DLSS5 neural renderer on the game window through the bundled Magpie "
-           "build for RTX 30 series cards. Play in a window; the key that turns it on and off "
-           "is set in Hotkeys (default: 2)."));
+        tr("Runs NVIDIA's DLSS5 neural renderer on the game picture inside the emulator, in a "
+           "window or full screen. It needs an NVIDIA RTX card and nvngx_dlssnr.dll in "
+           "qtplugins\\DLSS5. The key that turns it on and off is set in Hotkeys (default: 2)."));
     dlss5Layout->addWidget(dlss5CheckBox);
-
-    dlss5BoostCheckBox = new QCheckBox(tr("DLSS5 Boost"), dlss5GroupBox);
-    dlss5BoostCheckBox->setObjectName("dlss5BoostCheckBox");
-    dlss5BoostCheckBox->setToolTip(
-        tr("Runs the network at the resolution chosen below instead of the window's, which is "
-           "faster and a little softer."));
-    dlss5Layout->addWidget(dlss5BoostCheckBox);
 
     const auto addDlss5Row = [this, dlss5Layout](QWidget* label, QWidget* control) {
         auto* row = new QHBoxLayout();
@@ -1809,14 +1802,6 @@ void SettingsDialog::SetupGraphicsExtras() {
         row->addWidget(control, 1);
         dlss5Layout->addLayout(row);
     };
-
-    auto* resolutionLabel = new QLabel(tr("Resolution Network Runs At:"), dlss5GroupBox);
-    dlss5ResolutionComboBox = new QComboBox(dlss5GroupBox);
-    dlss5ResolutionComboBox->setObjectName("dlss5ResolutionComboBox");
-    for (int percent = 100; percent >= 30; percent -= 5) {
-        dlss5ResolutionComboBox->addItem(QStringLiteral("%1%").arg(percent), percent);
-    }
-    addDlss5Row(resolutionLabel, dlss5ResolutionComboBox);
 
     const auto addDlss5SliderRow = [this](QVBoxLayout* target, const QString& label,
                                           QSlider*& slider, int min, int max, int initial) {
@@ -1853,6 +1838,7 @@ void SettingsDialog::SetupGraphicsExtras() {
     styleRow->addWidget(dlss5StyleComboBox, 1);
     fineTuneLayout->addLayout(styleRow);
 
+    addDlss5SliderRow(fineTuneLayout, tr("Global Tone:"), dlss5GlobalToneSlider, 0, 200, 100);
     addDlss5SliderRow(fineTuneLayout, tr("Local Tone:"), dlss5LocalToneSlider, 0, 200, 100);
     addDlss5SliderRow(fineTuneLayout, tr("Local Structure:"), dlss5LocalStructureSlider, 0, 200,
                       100);
@@ -1883,23 +1869,20 @@ void SettingsDialog::LoadDlss5Settings() {
     };
 
     dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
-    dlss5BoostCheckBox->setChecked(j.value("Boost").toBool(false));
-    selectData(dlss5ResolutionComboBox,
-               qBound(30, j.value("NetworkResolutionPercent").toInt(50), 100));
-    selectData(dlss5StyleComboBox, qBound(0, j.value("Style").toInt(1), 2));
+    selectData(dlss5StyleComboBox, qBound(0, j.value("Style").toInt(0), 2));
     setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
-    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(-1.0), -1.0, 2.5);
+    setSlider(dlss5GlobalToneSlider, j.value("GlobalTone").toDouble(1.0), 0.0, 2.0);
+    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(1.5), 0.0, 2.0);
+    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.5), 0.0, 2.0);
+    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(1.5), -1.0, 2.5);
 }
 
 void SettingsDialog::SaveDlss5Settings() {
     QJsonObject j;
     j["Enabled"] = dlss5CheckBox->isChecked();
-    j["Boost"] = dlss5BoostCheckBox->isChecked();
-    j["NetworkResolutionPercent"] = dlss5ResolutionComboBox->currentData().toInt();
     j["Style"] = dlss5StyleComboBox->currentData().toInt();
     j["Intensity"] = dlss5IntensitySlider->value() * 0.01;
+    j["GlobalTone"] = dlss5GlobalToneSlider->value() * 0.01;
     j["LocalTone"] = dlss5LocalToneSlider->value() * 0.01;
     j["LocalStructure"] = dlss5LocalStructureSlider->value() * 0.01;
     j["SkinStructure"] = dlss5SkinStructureSlider->value() * 0.01;
