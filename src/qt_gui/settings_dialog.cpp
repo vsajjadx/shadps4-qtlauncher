@@ -2187,7 +2187,7 @@ void SettingsDialog::LoadDlss5Settings() {
 
     dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
     selectData(dlss5StyleComboBox, qBound(0, j.value("Style").toInt(1), 2));
-    selectData(dlss5NetworkComboBox, qBound(0, j.value("Preset").toInt(1), 2));
+    selectData(dlss5NetworkComboBox, qBound(0, j.value("Preset").toInt(2), 2));
     setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
     setSlider(dlss5GlobalToneSlider, j.value("GlobalTone").toDouble(1.0), 0.0, 2.0);
     setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(0.0), 0.0, 2.0);
