@@ -7,6 +7,7 @@
 #include <QMessageBox>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
+#include <QTimer>
 
 #include "common/logging/log.h"
 #include "ipc_client.h"
@@ -18,6 +19,9 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
                               bool disable_ipc) {
     if (process) {
         process->disconnect();
+        if (process->state() != QProcess::NotRunning) {
+            process->kill();
+        }
         process->deleteLater();
         process = nullptr;
     }
@@ -57,7 +61,20 @@ void IpcClient::resumeGame() {
 }
 
 void IpcClient::stopEmulator() {
+    if (process == nullptr) {
+        return;
+    }
     writeLine("STOP");
+
+    // STOP is only handled when the emulator's main loop is running. If the emulator is stuck
+    // (e.g. while loading a game), it never exits and the launcher would stay blocked, so
+    // terminate it when it has not quit by itself in time.
+    QProcess* const stopping = process;
+    QTimer::singleShot(8000, this, [this, stopping] {
+        if (process == stopping && stopping->state() != QProcess::NotRunning) {
+            stopping->kill();
+        }
+    });
 }
 
 void IpcClient::restartEmulator() {
