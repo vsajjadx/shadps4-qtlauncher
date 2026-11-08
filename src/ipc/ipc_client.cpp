@@ -234,12 +234,25 @@ void IpcClient::onStderr() {
 }
 
 void IpcClient::onStdout() {
-    QColor color;
-    QByteArray data = process->readAllStandardOutput();
-    QString dataString = QString::fromUtf8(data);
-    QStringList entries = dataString.split('\n');
+    static const QRegularExpression ansiRegex(
+        R"(\x1B\[[0-9;]*[mK])"); // ANSI escape codes from UNIX terminals
 
-    for (QString& entry : entries) {
+    const QByteArray data = process->readAllStandardOutput();
+    const QStringList entries = QString::fromUtf8(data).split('\n');
+
+    // Merge consecutive lines of the same colour into one signal, so the UI thread appends once
+    // per chunk instead of once per line (per-line appends froze the launcher during heavy logs).
+    QString batch;
+    QColor batchColor;
+    const auto flush = [&] {
+        if (!batch.isEmpty()) {
+            emit LogEntrySent(batch, batchColor);
+            batch.clear();
+        }
+    };
+
+    for (QString entry : entries) {
+        QColor color;
         if (entry.contains("<Warning>")) {
             color = Qt::yellow;
         } else if (entry.contains("<Error>")) {
@@ -259,16 +272,28 @@ void IpcClient::onStdout() {
         }
 
         if (m_log_to_terminal) {
-            std::cout << entry.toStdString() << std::endl;
+            std::cout << entry.toStdString() << '\n';
             continue;
         }
 
-        QRegularExpression ansiRegex(
-            R"(\x1B\[[0-9;]*[mK])"); // ANSI escape codes from UNIX terminals
-        entry = entry.replace(ansiRegex, "");
+        entry.replace(ansiRegex, "");
+        entry = entry.trimmed();
+        if (entry.isEmpty()) {
+            continue;
+        }
 
-        if (!entry.isEmpty())
-            emit LogEntrySent(entry.trimmed(), color);
+        if (!batch.isEmpty() && color != batchColor) {
+            flush();
+        }
+        batchColor = color;
+        if (!batch.isEmpty()) {
+            batch.append('\n');
+        }
+        batch.append(entry);
+    }
+    flush();
+    if (m_log_to_terminal) {
+        std::cout.flush();
     }
 }
 

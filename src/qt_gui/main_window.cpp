@@ -436,6 +436,7 @@ void MainWindow::CreateDockWindows(bool newDock) {
     ui->logDisplay = new QTextEdit(ui->splitter);
     ui->logDisplay->setText(tr("Game Log"));
     ui->logDisplay->setReadOnly(true);
+    ui->logDisplay->document()->setMaximumBlockCount(5000);
 
     if (newDock) {
         m_dock_widget.reset(new QDockWidget(tr("Game List"), this));
@@ -1097,8 +1098,14 @@ void MainWindow::CreateConnects() {
 }
 
 void MainWindow::PrintLog(QString entry, QColor textColor) {
+    // entry may hold several lines (one chunk of emulator output): append them with repaints
+    // suspended and scroll once, instead of re-laying out the log for every single line.
+    ui->logDisplay->setUpdatesEnabled(false);
     ui->logDisplay->setTextColor(textColor);
-    ui->logDisplay->append(entry);
+    for (const QString& line : entry.split('\n')) {
+        ui->logDisplay->append(line);
+    }
+    ui->logDisplay->setUpdatesEnabled(true);
     QScrollBar* sb = ui->logDisplay->verticalScrollBar();
     sb->setValue(sb->maximum());
 }
