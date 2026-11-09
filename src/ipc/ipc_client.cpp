@@ -12,19 +12,130 @@
 #include "common/logging/log.h"
 #include "ipc_client.h"
 
+#ifdef Q_OS_WIN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef NOGDI
+#define NOGDI
+#endif
+#include <windows.h>
+#pragma comment(lib, "user32.lib")
+#endif
+
+namespace {
+
+// How long the emulator may have no visible window (after it had one) before it is considered a
+// hung shutdown and gets killed. A normal exit takes well under a second.
+constexpr int WindowGoneGraceSeconds = 15;
+// How long to wait for the OS to finish terminating a killed process before the launcher stops
+// waiting for it.
+constexpr int KillWaitMs = 2000;
+
+#ifdef Q_OS_WIN
+struct WindowSearch {
+    DWORD pid;
+    bool found;
+};
+
+BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM param) {
+    auto* search = reinterpret_cast<WindowSearch*>(param);
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (pid == search->pid && IsWindowVisible(hwnd)) {
+        search->found = true;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+bool HasVisibleWindow(qint64 pid) {
+    WindowSearch search{static_cast<DWORD>(pid), false};
+    EnumWindows(EnumWindowsCallback, reinterpret_cast<LPARAM>(&search));
+    return search.found;
+}
+#endif
+
+} // namespace
+
 IpcClient::IpcClient(QObject* parent, bool log_to_terminal)
-    : QObject(parent), m_log_to_terminal(log_to_terminal) {}
+    : QObject(parent), m_log_to_terminal(log_to_terminal) {
+    watchdog = new QTimer(this);
+    watchdog->setInterval(1000);
+    connect(watchdog, &QTimer::timeout, this, [this] { onWatchdogTick(); });
+}
+
+IpcClient::~IpcClient() {
+    if (process) {
+        QProcess* p = process;
+        process = nullptr;
+        releaseProcess(p);
+    }
+}
+
+// Detaches a QProcess without ever destroying it while it is still running: ~QProcess() on a live
+// process blocks the calling (UI) thread in waitForFinished() for up to 30 s, which is what made
+// the launcher look frozen when the emulator would not die.
+void IpcClient::releaseProcess(QProcess* p) {
+    if (!p) {
+        return;
+    }
+    p->disconnect();
+    if (p->state() == QProcess::NotRunning) {
+        p->deleteLater();
+        return;
+    }
+    p->kill();
+    p->setParent(nullptr);
+    connect(p, &QProcess::finished, p, &QObject::deleteLater);
+}
+
+// Kills the emulator and makes sure the launcher is released even if the OS never reports the
+// process as finished (e.g. it is stuck inside a driver call).
+void IpcClient::killAndRelease(QProcess* p) {
+    if (!p || p->state() == QProcess::NotRunning) {
+        return;
+    }
+    p->kill();
+    QPointer<QProcess> guard(p);
+    QTimer::singleShot(KillWaitMs, this, [this, guard] {
+        if (guard && process == guard.data()) {
+            LOG_WARNING(IPC, "Emulator did not exit after being killed, releasing the launcher");
+            onProcessClosed();
+        }
+    });
+}
+
+void IpcClient::onWatchdogTick() {
+    if (!process || process->state() == QProcess::NotRunning) {
+        watchdog->stop();
+        return;
+    }
+#ifdef Q_OS_WIN
+    if (HasVisibleWindow(process->processId())) {
+        sawWindow = true;
+        noWindowTicks = 0;
+    } else if (sawWindow && ++noWindowTicks >= WindowGoneGraceSeconds) {
+        LOG_WARNING(IPC, "Emulator window was closed but the process did not exit, killing it");
+        watchdog->stop();
+        killAndRelease(process);
+    }
+#endif
+}
 
 void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, const QString& workDir,
                               bool disable_ipc) {
     if (process) {
-        process->disconnect();
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-        }
-        process->deleteLater();
+        QProcess* old = process;
         process = nullptr;
+        releaseProcess(old);
     }
+    watchdog->stop();
+    sawWindow = false;
+    noWindowTicks = 0;
     process = new QProcess(this);
 
     connect(process, &QProcess::readyReadStandardError, this, [this] { onStderr(); });
@@ -45,7 +156,12 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
     if (process->error() == QProcess::FailedToStart) {
         QMessageBox::critical(nullptr, "shadPS4",
                               QString(tr("Could not find the emulator executable")));
+        // No "finished" signal is ever emitted for a process that failed to start, so release the
+        // launcher's "game running" state here instead of leaving it locked forever.
+        onProcessClosed();
+        return;
     }
+    watchdog->start();
 }
 
 void IpcClient::startGame() {
@@ -69,15 +185,19 @@ void IpcClient::stopEmulator() {
     // STOP is only handled when the emulator's main loop is running. If the emulator is stuck
     // (e.g. while loading a game), it never exits and the launcher would stay blocked, so
     // terminate it when it has not quit by itself in time.
-    QProcess* const stopping = process;
+    QPointer<QProcess> stopping(process);
     QTimer::singleShot(8000, this, [this, stopping] {
-        if (process == stopping && stopping->state() != QProcess::NotRunning) {
-            stopping->kill();
+        if (stopping && process == stopping.data() && stopping->state() != QProcess::NotRunning) {
+            LOG_WARNING(IPC, "Emulator ignored STOP for 8 s, killing it");
+            killAndRelease(stopping.data());
         }
     });
 }
 
 void IpcClient::restartEmulator() {
+    if (process == nullptr) {
+        return;
+    }
     stopEmulator();
     pendingRestart = true;
 }
@@ -315,11 +435,17 @@ void IpcClient::onStdout() {
 }
 
 void IpcClient::onProcessClosed() {
-    gameClosedFunc();
-    if (process) {
-        process->disconnect();
-        process->deleteLater();
-        process = nullptr;
+    if (!process) {
+        return;
+    }
+    watchdog->stop();
+    // Release the process first so a problem in the UI handler below can never keep it locked.
+    QProcess* closed = process;
+    process = nullptr;
+    releaseProcess(closed);
+
+    if (gameClosedFunc) {
+        gameClosedFunc();
     }
     if (pendingRestart) {
         pendingRestart = false;
@@ -328,13 +454,14 @@ void IpcClient::onProcessClosed() {
 }
 
 void IpcClient::writeLine(const QString& text) {
-    if (process == nullptr) {
-        QMessageBox::critical(nullptr, "shadPS4", QString(tr("No game is running")));
+    // Never block or pop up a modal box here: when the emulator is gone or stuck, a blocking
+    // write (or a message box hidden behind the game window) freezes the whole launcher.
+    if (process == nullptr || process->state() != QProcess::Running) {
+        LOG_WARNING(IPC, "No emulator is running, ignoring '{}'", text.toStdString());
         return;
     }
 
     QByteArray data = text.toUtf8();
     data.append('\n');
     process->write(data);
-    process->waitForBytesWritten(1000);
 }

@@ -7,9 +7,12 @@
 
 #include <QColor>
 #include <QFileInfo>
+#include <QPointer>
 #include <QProcess>
 
 #include "common/memory_patcher.h"
+
+class QTimer;
 
 class IpcClient : public QObject {
     Q_OBJECT
@@ -19,6 +22,7 @@ signals:
 
 public:
     explicit IpcClient(QObject* parent = nullptr, bool log_to_terminal = false);
+    ~IpcClient() override;
     void startEmulator(const QFileInfo& exe, const QStringList& args,
                        const QString& workDir = QString(), bool disable_ipc = false);
     void startGame();
@@ -64,6 +68,15 @@ private:
     void onStdout();
     void onProcessClosed();
     void writeLine(const QString& text);
+
+    // Anti-hang helpers: the launcher must never stay locked behind an emulator that does not exit.
+    void releaseProcess(QProcess* p);
+    void killAndRelease(QProcess* p);
+    void onWatchdogTick();
+
+    QTimer* watchdog = nullptr;
+    bool sawWindow = false;
+    int noWindowTicks = 0;
 
     QProcess* process = nullptr;
     QByteArray buffer;
