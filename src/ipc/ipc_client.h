@@ -4,6 +4,7 @@
 #pragma once
 
 #include <functional>
+#include <unordered_map>
 
 #include <QColor>
 #include <QFileInfo>
@@ -19,12 +20,16 @@ class IpcClient : public QObject {
 
 signals:
     void LogEntrySent(QString entry, QColor textColor);
+    void EmulatorError(QString message);
 
 public:
     explicit IpcClient(QObject* parent = nullptr, bool log_to_terminal = false);
     ~IpcClient() override;
     void startEmulator(const QFileInfo& exe, const QStringList& args,
                        const QString& workDir = QString(), bool disable_ipc = false);
+    quint64 sessionId() const {
+        return session;
+    }
     void startGame();
     void pauseGame();
     void resumeGame();
@@ -68,6 +73,8 @@ private:
     void onStdout();
     void onProcessClosed();
     void writeLine(const QString& text);
+    void queueLog(const QByteArray& data);
+    void flushLogs();
 
     // Anti-hang helpers: the launcher must never stay locked behind an emulator that does not exit.
     void releaseProcess(QProcess* p);
@@ -75,14 +82,24 @@ private:
     void onWatchdogTick();
 
     QTimer* watchdog = nullptr;
+    QTimer* startupTimer = nullptr;
+    QTimer* stopTimer = nullptr;
+    QTimer* logTimer = nullptr;
+    QTimer* stderrTimer = nullptr;
     bool sawWindow = false;
     int noWindowTicks = 0;
 
     QProcess* process = nullptr;
     QByteArray buffer;
+    QByteArray logBuffer;
+    bool droppedLogs = false;
+    bool discardStderrLine = false;
+    bool handshakeComplete = false;
+    bool stopping = false;
+    quint64 session = 0;
     bool pendingRestart = false;
 
-    ParsingState parsingState;
-    int argsCounter;
+    ParsingState parsingState = ParsingState::normal;
+    int argsCounter = 0;
     bool m_log_to_terminal;
 };

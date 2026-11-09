@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <QDir>
-#include <QMessageBox>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QTimer>
@@ -34,6 +33,9 @@ constexpr int WindowGoneGraceSeconds = 15;
 // How long to wait for the OS to finish terminating a killed process before the launcher stops
 // waiting for it.
 constexpr int KillWaitMs = 2000;
+constexpr qsizetype MaxBufferedBytes = 128 * 1024;
+constexpr qsizetype MaxLineBytes = 4096;
+constexpr int MaxLinesPerTick = 128;
 
 #ifdef Q_OS_WIN
 struct WindowSearch {
@@ -66,6 +68,33 @@ IpcClient::IpcClient(QObject* parent, bool log_to_terminal)
     watchdog = new QTimer(this);
     watchdog->setInterval(1000);
     connect(watchdog, &QTimer::timeout, this, [this] { onWatchdogTick(); });
+    startupTimer = new QTimer(this);
+    startupTimer->setSingleShot(true);
+    startupTimer->setInterval(60000);
+    connect(startupTimer, &QTimer::timeout, this, [this] {
+        if (process) {
+            const QString message =
+                tr("The emulator did not complete its IPC handshake within 60 seconds.");
+            killAndRelease(process);
+            emit EmulatorError(message);
+        }
+    });
+    stopTimer = new QTimer(this);
+    stopTimer->setSingleShot(true);
+    stopTimer->setInterval(8000);
+    connect(stopTimer, &QTimer::timeout, this, [this] {
+        if (process) {
+            LOG_WARNING(IPC, "Emulator ignored STOP for 8 s, killing it");
+            killAndRelease(process);
+        }
+    });
+    logTimer = new QTimer(this);
+    logTimer->setInterval(50);
+    connect(logTimer, &QTimer::timeout, this, &IpcClient::flushLogs);
+    stderrTimer = new QTimer(this);
+    stderrTimer->setSingleShot(true);
+    stderrTimer->setInterval(1);
+    connect(stderrTimer, &QTimer::timeout, this, &IpcClient::onStderr);
 }
 
 IpcClient::~IpcClient() {
@@ -88,9 +117,14 @@ void IpcClient::releaseProcess(QProcess* p) {
         p->deleteLater();
         return;
     }
-    p->kill();
     p->setParent(nullptr);
     connect(p, &QProcess::finished, p, &QObject::deleteLater);
+    connect(p, &QProcess::errorOccurred, p, [p](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            p->deleteLater();
+        }
+    });
+    p->kill();
 }
 
 // Kills the emulator and makes sure the launcher is released even if the OS never reports the
@@ -133,7 +167,24 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
         process = nullptr;
         releaseProcess(old);
     }
+    ++session;
     watchdog->stop();
+    startupTimer->stop();
+    stopTimer->stop();
+    stderrTimer->stop();
+    buffer.clear();
+    logBuffer.clear();
+    droppedLogs = false;
+    discardStderrLine = false;
+    pendingRestart = false;
+    handshakeComplete = false;
+    stopping = false;
+    parsingState = ParsingState::normal;
+    argsCounter = 0;
+    parsedArgs.clear();
+    for (auto& [capability, supported] : supportedCapabilities) {
+        supported = false;
+    }
     sawWindow = false;
     noWindowTicks = 0;
     process = new QProcess(this);
@@ -141,10 +192,25 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
     connect(process, &QProcess::readyReadStandardError, this, [this] { onStderr(); });
     connect(process, &QProcess::readyReadStandardOutput, this, [this] { onStdout(); });
     connect(process, &QProcess::finished, this, [this] { onProcessClosed(); });
+    connect(process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+        if (!process || error != QProcess::FailedToStart) {
+            return;
+        }
+        const QString message = tr("Could not start the emulator: %1").arg(process->errorString());
+        onProcessClosed();
+        emit EmulatorError(message);
+    });
+    connect(process, &QProcess::started, this, [this, disable_ipc] {
+        watchdog->start();
+        if (!disable_ipc) {
+            startupTimer->start();
+        }
+    });
 
     process->setProcessChannelMode(QProcess::SeparateChannels);
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.remove("SHADPS4_ENABLE_IPC");
     if (!disable_ipc) {
         env.insert("SHADPS4_ENABLE_IPC", "true");
     }
@@ -152,20 +218,12 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
 
     process->setWorkingDirectory(workDir.isEmpty() ? exe.absolutePath() : workDir);
     process->start(exe.absoluteFilePath(), args, QIODevice::ReadWrite);
-
-    if (process->error() == QProcess::FailedToStart) {
-        QMessageBox::critical(nullptr, "shadPS4",
-                              QString(tr("Could not find the emulator executable")));
-        // No "finished" signal is ever emitted for a process that failed to start, so release the
-        // launcher's "game running" state here instead of leaving it locked forever.
-        onProcessClosed();
-        return;
-    }
-    watchdog->start();
 }
 
 void IpcClient::startGame() {
-    writeLine("START");
+    if (!stopping) {
+        writeLine("START");
+    }
 }
 
 void IpcClient::pauseGame() {
@@ -177,29 +235,22 @@ void IpcClient::resumeGame() {
 }
 
 void IpcClient::stopEmulator() {
-    if (process == nullptr) {
+    if (!process || stopping) {
         return;
     }
+    stopping = true;
+    ++session;
+    startupTimer->stop();
     writeLine("STOP");
-
-    // STOP is only handled when the emulator's main loop is running. If the emulator is stuck
-    // (e.g. while loading a game), it never exits and the launcher would stay blocked, so
-    // terminate it when it has not quit by itself in time.
-    QPointer<QProcess> stopping(process);
-    QTimer::singleShot(8000, this, [this, stopping] {
-        if (stopping && process == stopping.data() && stopping->state() != QProcess::NotRunning) {
-            LOG_WARNING(IPC, "Emulator ignored STOP for 8 s, killing it");
-            killAndRelease(stopping.data());
-        }
-    });
+    stopTimer->start();
 }
 
 void IpcClient::restartEmulator() {
     if (process == nullptr) {
         return;
     }
-    stopEmulator();
     pendingRestart = true;
+    stopEmulator();
 }
 
 void IpcClient::toggleFullscreen() {
@@ -315,70 +366,119 @@ void IpcClient::cancelRemoveDimensionFigure(uint8_t index) {
 }
 
 void IpcClient::onStderr() {
+    if (!process) {
+        return;
+    }
     buffer.append(process->readAllStandardError());
-    int idx;
-    while ((idx = buffer.indexOf('\n')) != -1) {
-        QByteArray line = buffer.left(idx);
-        buffer.remove(0, idx + 1);
-
+    if (buffer.size() > MaxBufferedBytes) {
+        buffer = buffer.right(MaxBufferedBytes);
+        discardStderrLine = true;
+        droppedLogs = true;
+    }
+    qsizetype consumed = 0;
+    int lines = 0;
+    while (lines++ < MaxLinesPerTick) {
+        const auto idx = buffer.indexOf('\n', consumed);
+        if (idx < 0) {
+            break;
+        }
+        QByteArray line = buffer.mid(consumed, idx - consumed);
+        consumed = idx + 1;
+        if (discardStderrLine || line.size() > MaxLineBytes) {
+            discardStderrLine = false;
+            droppedLogs = true;
+            continue;
+        }
         if (!line.isEmpty() && line.back() == '\r') {
             line.chop(1);
         }
-
-        if (!line.startsWith(";")) {
-            LOG_ERROR(Tty, "{}", line.toStdString());
+        if (!line.startsWith(';')) {
+            queueLog(line + '\n');
             continue;
         }
-
-        const QString s = QString::fromUtf8(line.mid(1)).trimmed();
-        if (s == "#IPC_ENABLED") {
-            LOG_INFO(IPC, "IPC detected");
-        } else if (s == "ENABLE_MEMORY_PATCH") {
-            supportedCapabilities["memory_patch"] = true;
-            LOG_INFO(IPC, "Feature detected: 'memory_patch'");
-        } else if (s == "ENABLE_EMU_CONTROL") {
-            supportedCapabilities["emu_control"] = true;
-            LOG_INFO(IPC, "Feature detected: 'emu_control'");
-        } else if (s == "#IPC_END") {
-            for (const auto& [capability, supported] : supportedCapabilities) {
-                if (not supported) {
-                    LOG_WARNING(IPC,
-                                "Feature: '{}' is not supported by the choosen emulator version",
-                                capability);
-                }
+        const QString text = QString::fromUtf8(line.mid(1)).trimmed();
+        if (parsingState == ParsingState::args_counter) {
+            bool ok = false;
+            argsCounter = text.toInt(&ok);
+            parsedArgs.clear();
+            parsingState = ok && argsCounter > 0 && argsCounter <= 256 ? ParsingState::args
+                                                                       : ParsingState::normal;
+            if (ok && argsCounter == 0) {
+                pendingRestart = true;
+                stopEmulator();
             }
-            LOG_INFO(IPC, "Start emu");
-            writeLine("RUN");
-            startGameFunc();
-        } else if (s == "RESTART") {
-            parsingState = ParsingState::args_counter;
-        }
-
-        else if (parsingState == ParsingState::args_counter) {
-            argsCounter = s.toInt();
-            parsingState = ParsingState::args;
-        }
-
-        else if (parsingState == ParsingState::args) {
-            parsedArgs.push_back(s.toStdString());
-            if (parsedArgs.size() == argsCounter) {
+        } else if (parsingState == ParsingState::args) {
+            parsedArgs.push_back(text.toStdString());
+            if (parsedArgs.size() == static_cast<size_t>(argsCounter)) {
                 parsingState = ParsingState::normal;
                 pendingRestart = true;
                 stopEmulator();
             }
+        } else if (text == "#IPC_ENABLED") {
+            LOG_INFO(IPC, "IPC detected");
+        } else if (text == "ENABLE_MEMORY_PATCH") {
+            supportedCapabilities["memory_patch"] = true;
+        } else if (text == "ENABLE_EMU_CONTROL") {
+            supportedCapabilities["emu_control"] = true;
+        } else if (text == "#IPC_END" && !handshakeComplete && !stopping) {
+            handshakeComplete = true;
+            startupTimer->stop();
+            writeLine("RUN");
+            const auto currentSession = session;
+            QTimer::singleShot(0, this, [this, currentSession] {
+                if (process && session == currentSession && !stopping && startGameFunc) {
+                    startGameFunc();
+                }
+            });
+        } else if (text == "RESTART") {
+            parsingState = ParsingState::args_counter;
         }
+    }
+    buffer.remove(0, consumed);
+    if (buffer.size() > MaxLineBytes && !buffer.contains('\n')) {
+        buffer.clear();
+        discardStderrLine = true;
+        droppedLogs = true;
+    }
+    if (buffer.contains('\n') && !stderrTimer->isActive()) {
+        stderrTimer->start();
     }
 }
 
 void IpcClient::onStdout() {
-    static const QRegularExpression ansiRegex(
-        R"(\x1B\[[0-9;]*[mK])"); // ANSI escape codes from UNIX terminals
+    if (process) {
+        queueLog(process->readAllStandardOutput());
+    }
+}
 
-    const QByteArray data = process->readAllStandardOutput();
-    const QStringList entries = QString::fromUtf8(data).split('\n');
+void IpcClient::queueLog(const QByteArray& data) {
+    if (data.size() >= MaxBufferedBytes) {
+        logBuffer = data.right(MaxBufferedBytes);
+        droppedLogs = true;
+    } else {
+        logBuffer.append(data);
+    }
+    if (logBuffer.size() > MaxBufferedBytes) {
+        logBuffer.remove(0, logBuffer.size() - MaxBufferedBytes);
+        droppedLogs = true;
+    }
+    if (droppedLogs) {
+        const auto newline = logBuffer.indexOf('\n');
+        if (newline >= 0) {
+            logBuffer.remove(0, newline + 1);
+        }
+    }
+    if (!logTimer->isActive()) {
+        logTimer->start();
+    }
+}
 
-    // Merge consecutive lines of the same colour into one signal, so the UI thread appends once
-    // per chunk instead of once per line (per-line appends froze the launcher during heavy logs).
+void IpcClient::flushLogs() {
+    static const QRegularExpression ansiRegex(R"(\x1B\[[0-9;]*[mK])");
+    if (droppedLogs) {
+        emit LogEntrySent(tr("[Log display throttled; excess output was discarded]"), Qt::yellow);
+        droppedLogs = false;
+    }
     QString batch;
     QColor batchColor;
     const auto flush = [&] {
@@ -387,9 +487,17 @@ void IpcClient::onStdout() {
             batch.clear();
         }
     };
-
-    for (QString entry : entries) {
-        QColor color;
+    qsizetype consumed = 0;
+    for (int lines = 0; lines < MaxLinesPerTick && consumed < 16 * 1024; ++lines) {
+        const auto newline = logBuffer.indexOf('\n', consumed);
+        if (newline < 0 && process && logBuffer.size() - consumed <= MaxLineBytes) {
+            break;
+        }
+        const auto end = newline < 0 ? logBuffer.size() : newline;
+        QString entry =
+            QString::fromUtf8(logBuffer.mid(consumed, qMin(end - consumed, MaxLineBytes)));
+        consumed = newline < 0 ? end : end + 1;
+        QColor color = Qt::white;
         if (entry.contains("<Warning>")) {
             color = Qt::yellow;
         } else if (entry.contains("<Error>")) {
@@ -400,25 +508,15 @@ void IpcClient::onStdout() {
             color = Qt::gray;
         } else if (entry.contains("<Debug>")) {
             color = Qt::cyan;
-        } else {
-            color = Qt::white;
         }
-
-        if (entry.isEmpty() || entry == "\x1B[m") {
-            continue;
-        }
-
         if (m_log_to_terminal) {
             std::cout << entry.toStdString() << '\n';
             continue;
         }
-
         entry.replace(ansiRegex, "");
-        entry = entry.trimmed();
         if (entry.isEmpty()) {
             continue;
         }
-
         if (!batch.isEmpty() && color != batchColor) {
             flush();
         }
@@ -428,9 +526,10 @@ void IpcClient::onStdout() {
         }
         batch.append(entry);
     }
+    logBuffer.remove(0, consumed);
     flush();
-    if (m_log_to_terminal) {
-        std::cout.flush();
+    if (logBuffer.isEmpty()) {
+        logTimer->stop();
     }
 }
 
@@ -438,7 +537,15 @@ void IpcClient::onProcessClosed() {
     if (!process) {
         return;
     }
+    ++session;
     watchdog->stop();
+    startupTimer->stop();
+    stopTimer->stop();
+    stderrTimer->stop();
+    buffer.clear();
+    stopping = false;
+    const bool restart = pendingRestart;
+    pendingRestart = false;
     // Release the process first so a problem in the UI handler below can never keep it locked.
     QProcess* closed = process;
     process = nullptr;
@@ -447,16 +554,19 @@ void IpcClient::onProcessClosed() {
     if (gameClosedFunc) {
         gameClosedFunc();
     }
-    if (pendingRestart) {
-        pendingRestart = false;
-        restartEmulatorFunc();
+    if (restart && restartEmulatorFunc) {
+        QTimer::singleShot(0, this, [this] {
+            if (!process && restartEmulatorFunc) {
+                restartEmulatorFunc();
+            }
+        });
     }
 }
 
 void IpcClient::writeLine(const QString& text) {
     // Never block or pop up a modal box here: when the emulator is gone or stuck, a blocking
     // write (or a message box hidden behind the game window) freezes the whole launcher.
-    if (process == nullptr || process->state() != QProcess::Running) {
+    if (process == nullptr || process->state() == QProcess::NotRunning) {
         LOG_WARNING(IPC, "No emulator is running, ignoring '{}'", text.toStdString());
         return;
     }

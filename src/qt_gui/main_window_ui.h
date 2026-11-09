@@ -7,15 +7,15 @@
 #include <QHBoxLayout>
 #include <QMainWindow>
 #include <QMenuBar>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSplitter>
-#include <QTextEdit>
 #include <QToolBar>
 
 class Ui_MainWindow {
 public:
     QSplitter* splitter;
-    QTextEdit* logDisplay;
+    QPlainTextEdit* logDisplay;
     QAction* bootGameAct;
     QAction* addElfFolderAct;
     QAction* shadFolderAct;

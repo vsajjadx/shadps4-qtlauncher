@@ -22,8 +22,10 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProgressDialog>
-#include <QStorageInfo>
 #include <QStatusBar>
+#include <QStorageInfo>
+#include <QTextCharFormat>
+#include <QTextCursor>
 #include <QtConcurrent/QtConcurrent>
 
 #include "about_dialog.h"
@@ -32,13 +34,14 @@
 #ifdef ENABLE_UPDATER
 #include "check_update.h"
 #endif
+#include "common/logging/log.h"
 #include "common/memory_patcher.h"
 #include "common/path_util.h"
 #include "common/scm_rev.h"
 #include "common/versions.h"
 #include "control_settings.h"
-#include "core/emulator_state.h"
 #include "core/emulator_settings.h"
+#include "core/emulator_state.h"
 #include "core/file_sys/game_backend.h"
 #include "crypto_key_dialog.h"
 #include "dimensions_dialog.h"
@@ -67,9 +70,20 @@ MainWindow::MainWindow(QWidget* parent, bool log_to_terminal)
     m_ipc_client->gameClosedFunc = [this]() { onGameClosed(); };
     m_ipc_client->restartEmulatorFunc = [this]() { RestartEmulator(); };
     m_ipc_client->startGameFunc = [this]() { RunGame(); };
+    connect(m_ipc_client.get(), &IpcClient::EmulatorError, this, [this](const QString& message) {
+        auto* box =
+            new QMessageBox(QMessageBox::Critical, tr("Emulator"), message, QMessageBox::Ok, this);
+        box->setAttribute(Qt::WA_DeleteOnClose);
+        box->setWindowModality(Qt::NonModal);
+        box->show();
+    });
 }
 
 MainWindow::~MainWindow() {
+    m_ipc_client->gameClosedFunc = {};
+    m_ipc_client->startGameFunc = {};
+    m_ipc_client->restartEmulatorFunc = {};
+    m_ipc_client->stopEmulator();
     SaveWindowState();
 }
 
@@ -188,13 +202,16 @@ void MainWindow::onGameClosed() {
             pauseButtonLabel->setVisible(false);
     }
 
-    // clear dialogs when game closed
-    skylander_dialog* sky_diag = skylander_dialog::get_dlg(this, m_ipc_client);
-    sky_diag->clear_all();
-    dimensions_dialog* dim_diag = dimensions_dialog::get_dlg(this, m_ipc_client);
-    dim_diag->clear_all();
-    infinity_dialog* inf_diag = infinity_dialog::get_dlg(this, m_ipc_client);
-    inf_diag->clear_all();
+    UpdateToolbarButtons();
+    for (auto* dialog : findChildren<skylander_dialog*>()) {
+        dialog->clear_all();
+    }
+    for (auto* dialog : findChildren<dimensions_dialog*>()) {
+        dialog->clear_all();
+    }
+    for (auto* dialog : findChildren<infinity_dialog*>()) {
+        dialog->clear_all();
+    }
 }
 
 void MainWindow::RestartGame() {
@@ -387,6 +404,9 @@ void MainWindow::AddUiWidgets() {
 }
 
 void MainWindow::UpdateToolbarButtons() {
+    if (!EmulatorState::GetInstance()->IsGameRunning()) {
+        return;
+    }
     // add toolbar widgets when game is running
     bool showLabels = ui->toggleLabelsAct->isChecked();
 
@@ -433,9 +453,11 @@ void MainWindow::CreateDockWindows(bool newDock) {
     QVBoxLayout* dockLayout = new QVBoxLayout(this);
 
     ui->splitter = new QSplitter(Qt::Vertical);
-    ui->logDisplay = new QTextEdit(ui->splitter);
-    ui->logDisplay->setText(tr("Game Log"));
+    ui->logDisplay = new QPlainTextEdit(ui->splitter);
+    ui->logDisplay->setPlainText(tr("Game Log"));
     ui->logDisplay->setReadOnly(true);
+    ui->logDisplay->setUndoRedoEnabled(false);
+    ui->logDisplay->setLineWrapMode(QPlainTextEdit::NoWrap);
     ui->logDisplay->document()->setMaximumBlockCount(5000);
 
     if (newDock) {
@@ -1098,16 +1120,24 @@ void MainWindow::CreateConnects() {
 }
 
 void MainWindow::PrintLog(QString entry, QColor textColor) {
-    // entry may hold several lines (one chunk of emulator output): append them with repaints
-    // suspended and scroll once, instead of re-laying out the log for every single line.
-    ui->logDisplay->setUpdatesEnabled(false);
-    ui->logDisplay->setTextColor(textColor);
-    for (const QString& line : entry.split('\n')) {
-        ui->logDisplay->append(line);
+    if (!ui->logDisplay->isVisible()) {
+        return;
     }
-    ui->logDisplay->setUpdatesEnabled(true);
-    QScrollBar* sb = ui->logDisplay->verticalScrollBar();
-    sb->setValue(sb->maximum());
+    auto* scrollBar = ui->logDisplay->verticalScrollBar();
+    const bool followTail = scrollBar->value() >= scrollBar->maximum() - 2;
+    QTextCursor cursor(ui->logDisplay->document());
+    cursor.movePosition(QTextCursor::End);
+    QTextCharFormat format;
+    format.setForeground(textColor);
+    cursor.beginEditBlock();
+    if (!ui->logDisplay->document()->isEmpty()) {
+        cursor.insertBlock();
+    }
+    cursor.insertText(entry, format);
+    cursor.endEditBlock();
+    if (followTail) {
+        scrollBar->setValue(scrollBar->maximum());
+    }
 }
 
 void MainWindow::StartGameWithArgs(QStringList args) {
@@ -1144,17 +1174,16 @@ void MainWindow::StartGameWithArgs(QStringList args) {
         }
     }
     if (gamePath != "") {
-        if (Core::FileSys::IsZArchiveFile(m_game_info->m_games[itemID].path)) {
+        if (table_mode != 2 && Core::FileSys::IsZArchiveFile(m_game_info->m_games[itemID].path)) {
             gamePath.chop(10);
         }
 
         AddRecentFiles(gamePath);
         const auto path = Common::FS::PathFromQString(gamePath);
         const auto archive_root = path.parent_path();
-        const bool eboot_present =
-            Core::FileSys::IsZArchiveFile(archive_root)
-                ? Core::FileSys::ReadGameFile(archive_root, "eboot.bin").has_value()
-                : std::filesystem::exists(path);
+        const bool eboot_present = Core::FileSys::IsZArchiveFile(archive_root)
+                                       ? Core::FileSys::Exists(archive_root, "eboot.bin")
+                                       : std::filesystem::exists(path);
         if (!eboot_present) {
             QMessageBox::critical(nullptr, tr("Run Game"), QString(tr("Eboot.bin file not found")));
             return;
@@ -1899,25 +1928,39 @@ void MainWindow::StartEmulatorExecutable(std::filesystem::path emuPath, QString 
 }
 
 void MainWindow::RunGame() {
-    auto gameInfo = GameInfoClass();
-    auto dir = last_game_path;
-    if (dir.stem() == "eboot") {
-        dir = dir.parent_path();
-    }
-    auto info = gameInfo.readGameInfo(dir);
-    auto appVersion = info.version;
-    auto gameSerial = info.serial;
-    auto patches = MemoryPatcher::readPatches(gameSerial, appVersion);
-    for (auto patch : patches) {
-        m_ipc_client->sendMemoryPatches(patch.modName, patch.address, patch.value, patch.target,
-                                        patch.size, patch.maskOffset, patch.littleEndian,
-                                        patch.mask, patch.maskOffset);
-    }
-
-    m_ipc_client->startGame();
+    using Patches = std::vector<MemoryPatcher::PendingPatch>;
+    auto* watcher = new QFutureWatcher<Patches>(this);
+    const auto session = m_ipc_client->sessionId();
+    connect(watcher, &QFutureWatcher<Patches>::finished, this, [this, watcher, session] {
+        watcher->deleteLater();
+        if (m_ipc_client->sessionId() != session) {
+            return;
+        }
+        for (const auto& patch : watcher->result()) {
+            m_ipc_client->sendMemoryPatches(patch.modName, patch.address, patch.value, patch.target,
+                                            patch.size, patch.maskOffset, patch.littleEndian,
+                                            patch.mask, patch.maskOffset);
+        }
+        m_ipc_client->startGame();
+    });
+    watcher->setFuture(QtConcurrent::run([path = last_game_path]() -> Patches {
+        try {
+            auto dir = path;
+            if (dir.stem() == "eboot") {
+                dir = dir.parent_path();
+            }
+            const auto info = GameInfoClass::readGameInfo(dir);
+            return MemoryPatcher::readPatches(info.serial, info.version);
+        } catch (const std::exception& error) {
+            LOG_ERROR(IPC, "Could not load game patches: {}", error.what());
+            return {};
+        }
+    }));
 }
 
 void MainWindow::RestartEmulator() {
+    EmulatorState::GetInstance()->SetGameRunning(true);
+    UpdateToolbarButtons();
     QString exe = m_gui_settings->GetValue(gui::vm_versionSelected).toString();
     QStringList args{"--game", QString::fromStdWString(last_game_path.wstring())};
 
