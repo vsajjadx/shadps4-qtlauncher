@@ -157,7 +157,9 @@ void GameListFrame::PopulateGameList(bool isInitialPopulation) {
     ApplyLastSorting(isInitialPopulation);
 
     for (int i = 0; i < m_game_info->m_games.size(); i++) {
-        SetTableItem(i, 1, QString::fromStdString(m_game_info->m_games[i].name));
+        SetNameItem(i, 1, QString::fromStdString(m_game_info->m_games[i].name),
+                    QString::fromStdString(m_game_info->m_games[i].serial),
+                    QString::fromStdString(m_game_info->m_games[i].region));
         if (std::filesystem::exists(Common::FS::GetUserPath(Common::FS::PathType::CustomConfigs) /
                                     (m_game_info->m_games[i].serial + ".json"))) {
             QTableWidgetItem* name_item = item(i, 1);
@@ -442,22 +444,64 @@ void GameListFrame::SetTableItem(int row, int column, QString itemStr, QString t
     this->setCellWidget(row, column, widget);
 }
 
+static QString RegionFlagPath(const QString& region) {
+    if (region == "Japan") {
+        return ":images/flag_jp.png";
+    } else if (region == "Europe") {
+        return ":images/flag_eu.png";
+    } else if (region == "USA") {
+        return ":images/flag_us.png";
+    } else if (region == "Asia") {
+        return ":images/flag_china.png";
+    } else if (region == "World") {
+        return ":images/flag_world.png";
+    }
+    return ":images/flag_unk.png";
+}
+
+// Name on the first line; the serial in parentheses with the region flag beside it below.
+void GameListFrame::SetNameItem(int row, int column, QString name, QString serial,
+                                QString region) {
+    QTableWidgetItem* item = new QTableWidgetItem();
+    QWidget* widget = new QWidget(this);
+    QVBoxLayout* layout = new QVBoxLayout(widget);
+    layout->setSpacing(2);
+
+    const auto add_shadow = [](QLabel* label) {
+        QGraphicsDropShadowEffect* shadow = new QGraphicsDropShadowEffect();
+        shadow->setBlurRadius(5);
+        shadow->setColor(QColor(0, 0, 0, 160));
+        shadow->setOffset(2, 2);
+        label->setGraphicsEffect(shadow);
+    };
+
+    QLabel* name_label = new QLabel(name, widget);
+    name_label->setStyleSheet("color: white; font-size: 16px; font-weight: bold;");
+    add_shadow(name_label);
+    layout->addWidget(name_label);
+
+    QHBoxLayout* info = new QHBoxLayout();
+    info->setSpacing(6);
+    QLabel* serial_label = new QLabel(QString("(%1)").arg(serial), widget);
+    serial_label->setStyleSheet("color: #d0d0d0; font-size: 13px; font-weight: bold;");
+    add_shadow(serial_label);
+    info->addWidget(serial_label);
+    QLabel* flag_label = new QLabel(widget);
+    flag_label->setPixmap(QPixmap(RegionFlagPath(region))
+                              .scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    flag_label->setToolTip(region);
+    info->addWidget(flag_label);
+    info->addStretch();
+    layout->addLayout(info);
+
+    widget->setLayout(layout);
+    this->setItem(row, column, item);
+    this->setCellWidget(row, column, widget);
+}
+
 void GameListFrame::SetRegionFlag(int row, int column, QString itemStr) {
     QTableWidgetItem* item = new QTableWidgetItem();
-    QImage scaledPixmap;
-    if (itemStr == "Japan") {
-        scaledPixmap = QImage(":images/flag_jp.png");
-    } else if (itemStr == "Europe") {
-        scaledPixmap = QImage(":images/flag_eu.png");
-    } else if (itemStr == "USA") {
-        scaledPixmap = QImage(":images/flag_us.png");
-    } else if (itemStr == "Asia") {
-        scaledPixmap = QImage(":images/flag_china.png");
-    } else if (itemStr == "World") {
-        scaledPixmap = QImage(":images/flag_world.png");
-    } else {
-        scaledPixmap = QImage(":images/flag_unk.png");
-    }
+    QImage scaledPixmap = QImage(RegionFlagPath(itemStr));
     QWidget* widget = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(widget);
     QLabel* label = new QLabel(widget);
@@ -536,8 +580,6 @@ void GameListFrame::ToggleColumnVisibility() {
     bool showIcon = m_gui_settings->GetValue(gui::glc_showIconEnabled).toBool();
     bool showName = m_gui_settings->GetValue(gui::glc_showNameEnabled).toBool();
     bool showCompatibility = m_gui_settings->GetValue(gui::glc_showCompatibility).toBool();
-    bool showSerial = m_gui_settings->GetValue(gui::glc_showSerialEnabled).toBool();
-    bool showRegion = m_gui_settings->GetValue(gui::glc_showRegionEnabled).toBool();
     bool showFirmware = m_gui_settings->GetValue(gui::glc_showFirmwareEnabled).toBool();
     bool showSize = m_gui_settings->GetValue(gui::glc_showLoadGameSizeEnabled).toBool();
     bool showVersion = m_gui_settings->GetValue(gui::glc_showVersionEnabled).toBool();
@@ -548,8 +590,9 @@ void GameListFrame::ToggleColumnVisibility() {
     this->setColumnHidden(0, !showIcon);          // Icon
     this->setColumnHidden(1, !showName);          // Name
     this->setColumnHidden(2, !showCompatibility); // Compatibility
-    this->setColumnHidden(3, !showSerial);        // Serial
-    this->setColumnHidden(4, !showRegion);        // Region
+    // The serial and the region flag are shown under the name.
+    this->setColumnHidden(3, true); // Serial
+    this->setColumnHidden(4, true); // Region
     this->setColumnHidden(5, !showFirmware);      // Firmware
     this->setColumnHidden(6, !showSize);          // Size
     this->setColumnHidden(7, !showVersion);       // Version
@@ -583,8 +626,6 @@ void GameListFrame::ShowHeaderContextMenu(const QPoint& pos) {
         {tr("Icon"), 0, gui::glc_showIconEnabled},
         {tr("Name"), 1, gui::glc_showNameEnabled},
         {tr("Compatibility"), 2, gui::glc_showCompatibility},
-        {tr("Serial"), 3, gui::glc_showSerialEnabled},
-        {tr("Region"), 4, gui::glc_showRegionEnabled},
         {tr("Firmware"), 5, gui::glc_showFirmwareEnabled},
         {tr("Size"), 6, gui::glc_showLoadGameSizeEnabled},
         {tr("Version"), 7, gui::glc_showVersionEnabled},
