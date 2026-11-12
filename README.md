@@ -5,30 +5,44 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 <h1 align="center">
   <br>
-  <a href="https://shadps4.net/"><img src="https://github.com/shadps4-emu/shadPS4-qtlauncher/blob/main/.github/shadps4.png" width="220"></a>
+  <img src="https://github.com/shadps4-emu/shadPS4-qtlauncher/blob/main/.github/shadps4.png" width="220">
   <br>
-  <b>QtLauncher</b>
+  <b>QtLauncher — shadPS4 Anti-Crash</b>
   <br>
 </h1>
 
-<h1 align="center">
- <a href="https://discord.gg/bFJxfftGW6">
-        <img src="https://img.shields.io/discord/1080089157554155590?color=5865F2&label=shadPS4%20Discord&logo=Discord&logoColor=white" width="275">
- <a href="https://github.com/shadps4-emu/shadPS4-qtlauncher/releases/latest">
-        <img src="https://img.shields.io/github/downloads/shadps4-emu/shadPS4-qtlauncher/total.svg" width="140">
- <a href="https://shadps4.net/">
-        <img src="https://img.shields.io/badge/shadPS4-website-8A2BE2" width="150">
- <a href="https://x.com/shadps4">
-        <img src="https://img.shields.io/badge/-Join%20us-black?logo=X&logoColor=white" width="100">
- <a href="https://github.com/shadps4-emu/shadPS4-qtlauncher/stargazers">
-        <img src="https://img.shields.io/github/stars/shadps4-emu/shadPS4-qtlauncher" width="120">
-</h1>
+<p align="center">
+The launcher of the <a href="https://github.com/vsajjadx/shadPS4"><b>shadPS4 Anti-Crash</b></a> fork:
+the official shadPS4 QtLauncher with additions for this fork.
+</p>
 
+# Download
 
-# General information
+You don't need to build anything. The launcher comes **together with the emulator** in one zip:
+download the latest one from the emulator's [**Releases**](https://github.com/vsajjadx/shadPS4/releases/latest),
+unzip it and run `shadPS4QtLauncher.exe`.
 
-**QtLauncher** is the official launcher for [shadPS4](https://github.com/shadps4-emu/shadPS4). It was separated from the main repository and is now in development here.
+# What's different from the official launcher
 
+- **Game list:** each game shows its name, and under it the serial, region flag and game version.
+- **About → Recent:** always describes the latest build, with this fork's changes and fixes.
+- **Automatic updates** from this fork's releases. Your saves and settings are never touched.
+- **Direct PKG execution:** point it at a folder with the base game, update and DLC PKGs and launch.
+- **Graphics switches** for DLSS5, Boost, Frame Generation and Auto Quality in **Settings → Graphics**.
+- **Easy window size:** pick 720p, 1080p, 1440p, 4K and more from a list.
+- **Compatibility list:** the official list plus the games this build runs that the official one doesn't.
+- **Clean title:** just the launcher name and version.
+
+The branch with these changes is [`fork`](https://github.com/vsajjadx/shadps4-qtlauncher/tree/fork).
+
+# Author
+
+- GitHub: [vsajjadx](https://github.com/vsajjadx)
+- Reddit: [u/Unhappy_Advantage_10](https://www.reddit.com/user/Unhappy_Advantage_10/)
+
+Made with the help of **Claude**, the AI assistant by Anthropic.
+
+Based on the official [shadPS4 QtLauncher](https://github.com/shadps4-emu/shadPS4-qtlauncher).
 
 # Building
 
