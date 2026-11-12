@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <QDesktopServices>
+#include <QFile>
+#include <QPainter>
+#include <QPainterPath>
+#include <QTextBrowser>
 #include <QEvent>
 #include <QGraphicsDropShadowEffect>
 #include <QImage>
@@ -15,6 +19,30 @@
 AboutDialog::AboutDialog(std::shared_ptr<gui_settings> gui_settings, QWidget* parent)
     : QDialog(parent), ui(new Ui::AboutDialog), m_gui_settings(std::move(gui_settings)) {
     ui->setupUi(this);
+
+    // The author's links: GitHub and Reddit.
+    ui->image_1->setToolTip(QStringLiteral("https://github.com/vsajjadx"));
+    ui->image_2->setPixmap(RedditLogo());
+    ui->image_2->setToolTip(QStringLiteral("https://www.reddit.com/user/Unhappy_Advantage_10/"));
+    ui->image_3->setVisible(false);
+    ui->image_4->setVisible(false);
+    ui->image_5->setVisible(false);
+
+    // Recent: what changed in this build, bundled with it.
+    resize(width(), height() + 330);
+    setMinimumSize(size());
+    setMaximumSize(size());
+    QLabel* recent_title = new QLabel(tr("Recent"), this);
+    recent_title->setStyleSheet("font-size: 18px; font-weight: bold;");
+    recent_title->setGeometry(20, 305, 300, 28);
+    QTextBrowser* recent = new QTextBrowser(this);
+    recent->setGeometry(20, 335, width() - 40, 290);
+    recent->setOpenExternalLinks(true);
+    QFile notes(":/recent.md");
+    if (notes.open(QIODevice::ReadOnly)) {
+        recent->setMarkdown(QString::fromUtf8(notes.readAll()));
+    }
+
     preloadImages();
 
     ui->image_1->setAttribute(Qt::WA_Hover, true);
@@ -30,16 +58,43 @@ AboutDialog::AboutDialog(std::shared_ptr<gui_settings> gui_settings, QWidget* pa
     ui->image_5->installEventFilter(this);
 
 #ifdef FORK_BUNDLE_REPO
-    // The fork's package links only to its own GitHub page.
     setWindowTitle(tr("About shadPS4 Anti-Crash"));
     ui->shad_title->setText("shadPS4 Anti-Crash");
     ui->shad_title->adjustSize();
-    ui->image_1->setToolTip(QStringLiteral("https://github.com/%1").arg(FORK_BUNDLE_REPO));
-    ui->image_2->setVisible(false);
-    ui->image_3->setVisible(false);
-    ui->image_4->setVisible(false);
-    ui->image_5->setVisible(false);
 #endif
+}
+
+// Black Reddit mark on transparent, like the other single-color link icons (the theme code
+// inverts them).
+QPixmap AboutDialog::RedditLogo() {
+    QPixmap pixmap(256, 256);
+    pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap);
+    p.setRenderHint(QPainter::Antialiasing);
+    QPainterPath disc;
+    disc.addEllipse(QRectF(8, 8, 240, 240));
+    QPainterPath face;
+    face.addEllipse(QRectF(48, 104, 160, 104)); // head
+    face.addEllipse(QRectF(40, 96, 40, 40));    // ears
+    face.addEllipse(QRectF(176, 96, 40, 40));
+    face.addEllipse(QRectF(156, 40, 30, 30));   // antenna ball
+    QPainterPath stalk;
+    stalk.moveTo(128, 106);
+    stalk.lineTo(140, 52);
+    stalk.lineTo(166, 58);
+    QPainterPathStroker stroker;
+    stroker.setWidth(10);
+    face = face.united(stroker.createStroke(stalk));
+    QPainterPath details;
+    details.addEllipse(QRectF(88, 136, 24, 24)); // eyes
+    details.addEllipse(QRectF(144, 136, 24, 24));
+    QPainterPath smile;
+    smile.moveTo(96, 176);
+    smile.quadTo(128, 196, 160, 176);
+    stroker.setWidth(8);
+    QPainterPath shape = disc.subtracted(face).united(details.united(stroker.createStroke(smile)));
+    p.fillPath(shape, Qt::black);
+    return pixmap;
 }
 
 AboutDialog::~AboutDialog() {
@@ -165,14 +220,9 @@ bool AboutDialog::eventFilter(QObject* obj, QEvent* event) {
         }
     } else if (event->type() == QEvent::MouseButtonPress) {
         if (obj == ui->image_1) {
-#ifdef FORK_BUNDLE_REPO
-            QDesktopServices::openUrl(
-                QUrl(QStringLiteral("https://github.com/%1").arg(FORK_BUNDLE_REPO)));
-#else
-            QDesktopServices::openUrl(QUrl("https://github.com/shadps4-emu/shadPS4"));
-#endif
+            QDesktopServices::openUrl(QUrl("https://github.com/vsajjadx"));
         } else if (obj == ui->image_2) {
-            QDesktopServices::openUrl(QUrl("https://discord.gg/bFJxfftGW6"));
+            QDesktopServices::openUrl(QUrl("https://www.reddit.com/user/Unhappy_Advantage_10/"));
         } else if (obj == ui->image_3) {
             QDesktopServices::openUrl(QUrl("https://www.youtube.com/@shadPS4/videos"));
         } else if (obj == ui->image_4) {

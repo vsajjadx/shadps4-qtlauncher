@@ -25,6 +25,7 @@ public:
 private:
     Ui::AboutDialog* ui;
 
+    static QPixmap RedditLogo();
     void preloadImages();
     void updateImagesForCurrentTheme();
     void applyHoverEffect(QLabel* label);
