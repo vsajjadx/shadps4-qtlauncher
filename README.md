@@ -47,7 +47,10 @@ Based on the official [shadPS4 QtLauncher](https://github.com/shadps4-emu/shadPS
 # Building
 
 > [!IMPORTANT]
-> If you want to use this launcher, you don't have to follow the build instructions, you can simply download the launcher from the [**release tab**](https://github.com/shadps4-emu/shadPS4-qtlauncher/releases).
+> To use this launcher you don't have to build it: download the zip from the emulator's
+> [**Releases**](https://github.com/vsajjadx/shadPS4/releases/latest). To build it yourself, use the
+> [`fork`](https://github.com/vsajjadx/shadps4-qtlauncher/tree/fork) branch and the official
+> instructions below.
 
 ## Windows
 
@@ -71,7 +74,12 @@ Check the build instructions for [**macOS**](https://github.com/shadps4-emu/shad
 F10 | FPS Counter
 Ctrl+F10 | Video Debug Info
 F11 | Fullscreen
-F12 | Trigger RenderDoc Capture
+F12 | Screenshot (a RenderDoc capture when RenderDoc is enabled)
+1 | Frame generation on/off
+Alt+Enter | Borderless fullscreen
+0 | Slow motion (one frame per second)
+9 | Freeze the frame
+8 | Save the render stages of the frozen frame (for bug reports)
 
 > [!NOTE]
 > Xbox and DualShock controllers work out of the box.
@@ -109,8 +117,9 @@ Logo is done by [**Xphalnos**](https://github.com/Xphalnos)
 
 # Contributing
 
-If you want to contribute, please read the [**CONTRIBUTING.md**](https://github.com/shadps4-emu/shadPS4-qtlauncher/blob/main/CONTRIBUTING.md) file.\
-Open a PR and we'll check it :)
+Found a bug in this launcher or the emulator? Open an [**issue**](https://github.com/vsajjadx/shadPS4/issues)
+with the log file. Pull requests are welcome on the
+[`fork`](https://github.com/vsajjadx/shadps4-qtlauncher/tree/fork) branch.
 
 # Translations
 
