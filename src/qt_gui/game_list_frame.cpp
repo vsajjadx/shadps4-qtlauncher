@@ -589,7 +589,6 @@ void GameListFrame::ToggleColumnVisibility() {
     bool showCompatibility = m_gui_settings->GetValue(gui::glc_showCompatibility).toBool();
     bool showFirmware = m_gui_settings->GetValue(gui::glc_showFirmwareEnabled).toBool();
     bool showSize = m_gui_settings->GetValue(gui::glc_showLoadGameSizeEnabled).toBool();
-    bool showVersion = m_gui_settings->GetValue(gui::glc_showVersionEnabled).toBool();
     bool showPlayTime = m_gui_settings->GetValue(gui::glc_showPlayTimeEnabled).toBool();
     bool showPath = m_gui_settings->GetValue(gui::glc_showPathEnabled).toBool();
     bool showFavorite = m_gui_settings->GetValue(gui::glc_showFavoriteEnabled).toBool();
@@ -602,7 +601,7 @@ void GameListFrame::ToggleColumnVisibility() {
     this->setColumnHidden(4, true); // Region
     this->setColumnHidden(5, !showFirmware);      // Firmware
     this->setColumnHidden(6, !showSize);          // Size
-    this->setColumnHidden(7, !showVersion);       // Version
+    this->setColumnHidden(7, true); // Version, shown under the name
     this->setColumnHidden(8, !showPlayTime);      // Play Time
     this->setColumnHidden(9, !showPath);          // Path
     this->setColumnHidden(10, !showFavorite);     // Favorite
@@ -635,7 +634,6 @@ void GameListFrame::ShowHeaderContextMenu(const QPoint& pos) {
         {tr("Compatibility"), 2, gui::glc_showCompatibility},
         {tr("Firmware"), 5, gui::glc_showFirmwareEnabled},
         {tr("Size"), 6, gui::glc_showLoadGameSizeEnabled},
-        {tr("Version"), 7, gui::glc_showVersionEnabled},
         {tr("Play Time"), 8, gui::glc_showPlayTimeEnabled},
         {tr("Path"), 9, gui::glc_showPathEnabled},
         {tr("Favorite"), 10, gui::glc_showFavoriteEnabled},
