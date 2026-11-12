@@ -45,7 +45,8 @@ public Q_SLOTS:
 
 private:
     void SetTableItem(int row, int column, QString itemStr, QString tooltip = {});
-    void SetNameItem(int row, int column, QString name, QString serial, QString region);
+    void SetNameItem(int row, int column, QString name, QString serial, QString region,
+                     QString version);
     void SetRegionFlag(int row, int column, QString itemStr);
     void SetFavoriteIcon(int row, int column);
     void SetCompatibilityItem(int row, int column, CompatibilityEntry entry);

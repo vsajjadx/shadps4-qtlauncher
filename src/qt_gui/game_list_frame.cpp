@@ -159,7 +159,8 @@ void GameListFrame::PopulateGameList(bool isInitialPopulation) {
     for (int i = 0; i < m_game_info->m_games.size(); i++) {
         SetNameItem(i, 1, QString::fromStdString(m_game_info->m_games[i].name),
                     QString::fromStdString(m_game_info->m_games[i].serial),
-                    QString::fromStdString(m_game_info->m_games[i].region));
+                    QString::fromStdString(m_game_info->m_games[i].region),
+                    QString::fromStdString(m_game_info->m_games[i].version));
         if (std::filesystem::exists(Common::FS::GetUserPath(Common::FS::PathType::CustomConfigs) /
                                     (m_game_info->m_games[i].serial + ".json"))) {
             QTableWidgetItem* name_item = item(i, 1);
@@ -461,7 +462,7 @@ static QString RegionFlagPath(const QString& region) {
 
 // Name on the first line; the serial in parentheses with the region flag beside it below.
 void GameListFrame::SetNameItem(int row, int column, QString name, QString serial,
-                                QString region) {
+                                QString region, QString version) {
     QTableWidgetItem* item = new QTableWidgetItem();
     QWidget* widget = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(widget);
@@ -491,6 +492,12 @@ void GameListFrame::SetNameItem(int row, int column, QString name, QString seria
                               .scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     flag_label->setToolTip(region);
     info->addWidget(flag_label);
+    if (!version.isEmpty()) {
+        QLabel* version_label = new QLabel(QString("v%1").arg(version), widget);
+        version_label->setStyleSheet("color: #d0d0d0; font-size: 13px; font-weight: bold;");
+        add_shadow(version_label);
+        info->addWidget(version_label);
+    }
     info->addStretch();
     layout->addLayout(info);
 
