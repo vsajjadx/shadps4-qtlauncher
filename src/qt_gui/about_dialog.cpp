@@ -67,42 +67,38 @@ AboutDialog::AboutDialog(std::shared_ptr<gui_settings> gui_settings, QWidget* pa
 // Black Reddit mark on transparent, like the other single-color link icons (the theme code
 // inverts them).
 QPixmap AboutDialog::RedditLogo() {
-    QPixmap pixmap(256, 256);
-    pixmap.fill(Qt::transparent);
-    QPainter p(&pixmap);
+    // Same layout as images/github.png: a black disc filling the image with a white figure.
+    QImage image(256, 256, QImage::Format_ARGB32);
+    image.fill(Qt::transparent);
+    QPainter p(&image);
     p.setRenderHint(QPainter::Antialiasing);
     p.setPen(Qt::NoPen);
-    // Filled disc.
     p.setBrush(Qt::black);
-    p.drawEllipse(QRectF(8, 8, 240, 240));
-    // Cut the alien out of it.
-    p.setCompositionMode(QPainter::CompositionMode_Clear);
-    p.drawEllipse(QRectF(48, 104, 160, 104)); // head
-    p.drawEllipse(QRectF(40, 96, 40, 40));    // ears
-    p.drawEllipse(QRectF(176, 96, 40, 40));
-    p.drawEllipse(QRectF(156, 40, 30, 30));   // antenna ball
-    QPen stalk_pen(Qt::black, 10, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    p.setPen(stalk_pen);
+    p.drawEllipse(QRectF(0, 0, 256, 256));
+    p.setBrush(Qt::white);
+    p.drawEllipse(QRectF(44, 104, 168, 108)); // head
+    p.drawEllipse(QRectF(34, 90, 46, 46));    // ears
+    p.drawEllipse(QRectF(176, 90, 46, 46));
+    p.drawEllipse(QRectF(154, 34, 36, 36));   // antenna ball
+    p.setPen(QPen(Qt::white, 12, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     p.setBrush(Qt::NoBrush);
     QPainterPath stalk;
-    stalk.moveTo(128, 106);
+    stalk.moveTo(128, 108);
     stalk.lineTo(140, 52);
-    stalk.lineTo(166, 58);
+    stalk.lineTo(166, 54);
     p.drawPath(stalk);
-    // Eyes and smile back in black.
-    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
     p.setPen(Qt::NoPen);
     p.setBrush(Qt::black);
-    p.drawEllipse(QRectF(88, 136, 24, 24));
-    p.drawEllipse(QRectF(144, 136, 24, 24));
-    p.setPen(QPen(Qt::black, 8, Qt::SolidLine, Qt::RoundCap));
+    p.drawEllipse(QRectF(88, 138, 26, 26)); // eyes
+    p.drawEllipse(QRectF(142, 138, 26, 26));
+    p.setPen(QPen(Qt::black, 9, Qt::SolidLine, Qt::RoundCap));
     p.setBrush(Qt::NoBrush);
     QPainterPath smile;
-    smile.moveTo(96, 176);
-    smile.quadTo(128, 196, 160, 176);
+    smile.moveTo(96, 180);
+    smile.quadTo(128, 200, 160, 180);
     p.drawPath(smile);
     p.end();
-    return pixmap;
+    return QPixmap::fromImage(image);
 }
 
 AboutDialog::~AboutDialog() {
