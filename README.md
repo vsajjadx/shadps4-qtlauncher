@@ -28,7 +28,7 @@ unzip it and run `shadPS4QtLauncher.exe`.
 - **About → Recent:** always describes the latest build, with this fork's changes and fixes.
 - **Automatic updates** from this fork's releases. Your saves and settings are never touched.
 - **Direct PKG execution:** point it at a folder with the base game, update and DLC PKGs and launch.
-- **Graphics switches** for DLSS5, Boost, Frame Generation and Auto Quality in **Settings → Graphics**.
+- **Frame generation switch** in **Settings → Graphics**.
 - **Easy window size:** pick 720p, 1080p, 1440p, 4K and more from a list.
 - **Compatibility list:** the official list plus the games this build runs that the official one doesn't.
 - **Clean title:** just the launcher name and version.
