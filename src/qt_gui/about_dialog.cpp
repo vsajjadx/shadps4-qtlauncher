@@ -71,29 +71,37 @@ QPixmap AboutDialog::RedditLogo() {
     pixmap.fill(Qt::transparent);
     QPainter p(&pixmap);
     p.setRenderHint(QPainter::Antialiasing);
-    QPainterPath disc;
-    disc.addEllipse(QRectF(8, 8, 240, 240));
-    QPainterPath face;
-    face.addEllipse(QRectF(48, 104, 160, 104)); // head
-    face.addEllipse(QRectF(40, 96, 40, 40));    // ears
-    face.addEllipse(QRectF(176, 96, 40, 40));
-    face.addEllipse(QRectF(156, 40, 30, 30));   // antenna ball
+    p.setPen(Qt::NoPen);
+    // Filled disc.
+    p.setBrush(Qt::black);
+    p.drawEllipse(QRectF(8, 8, 240, 240));
+    // Cut the alien out of it.
+    p.setCompositionMode(QPainter::CompositionMode_Clear);
+    p.drawEllipse(QRectF(48, 104, 160, 104)); // head
+    p.drawEllipse(QRectF(40, 96, 40, 40));    // ears
+    p.drawEllipse(QRectF(176, 96, 40, 40));
+    p.drawEllipse(QRectF(156, 40, 30, 30));   // antenna ball
+    QPen stalk_pen(Qt::black, 10, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(stalk_pen);
+    p.setBrush(Qt::NoBrush);
     QPainterPath stalk;
     stalk.moveTo(128, 106);
     stalk.lineTo(140, 52);
     stalk.lineTo(166, 58);
-    QPainterPathStroker stroker;
-    stroker.setWidth(10);
-    face = face.united(stroker.createStroke(stalk));
-    QPainterPath details;
-    details.addEllipse(QRectF(88, 136, 24, 24)); // eyes
-    details.addEllipse(QRectF(144, 136, 24, 24));
+    p.drawPath(stalk);
+    // Eyes and smile back in black.
+    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    p.setPen(Qt::NoPen);
+    p.setBrush(Qt::black);
+    p.drawEllipse(QRectF(88, 136, 24, 24));
+    p.drawEllipse(QRectF(144, 136, 24, 24));
+    p.setPen(QPen(Qt::black, 8, Qt::SolidLine, Qt::RoundCap));
+    p.setBrush(Qt::NoBrush);
     QPainterPath smile;
     smile.moveTo(96, 176);
     smile.quadTo(128, 196, 160, 176);
-    stroker.setWidth(8);
-    QPainterPath shape = disc.subtracted(face).united(details.united(stroker.createStroke(smile)));
-    p.fillPath(shape, Qt::black);
+    p.drawPath(smile);
+    p.end();
     return pixmap;
 }
 
