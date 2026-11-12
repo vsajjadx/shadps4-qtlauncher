@@ -113,16 +113,9 @@ bool MainWindow::Init() {
     SetLastIconSizeBullet();
     // show ui
     setMinimumSize(900, 405);
-    std::string window_title = "";
-    std::string remote_url(Common::g_scm_remote_url);
-    std::string remote_host = Common::GetRemoteNameFromLink();
-    if (remote_host == "shadps4-emu" || remote_url.length() == 0) {
-        window_title = fmt::format("shadPS4QtLauncher v{} {} {}", Common::g_scm_app_version,
-                                   Common::g_scm_branch, Common::g_scm_desc);
-    } else {
-        window_title = fmt::format("shadPS4QtLauncher v{} {}/{} {}", Common::g_scm_app_version,
-                                   remote_host, Common::g_scm_branch, Common::g_scm_desc);
-    }
+    // Only the build's name and version.
+    const std::string window_title =
+        fmt::format("shadPS4QtLauncher v{}", Common::g_scm_app_version);
     setWindowTitle(QString::fromStdString(window_title));
     this->show();
     // load game list
