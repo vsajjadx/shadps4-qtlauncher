@@ -52,7 +52,7 @@ Hotkeys::Hotkeys(std::shared_ptr<IpcClient> ipc_client, bool isGameRunning, QWid
     PadButtonsList = {ui->fpsButtonPad,     ui->quitButtonPad,       ui->fullscreenButtonPad,
                       ui->pauseButtonPad,   ui->reloadButtonPad,     ui->volUpButtonPad,
                       ui->volDownButtonPad, ui->screenshotButtonPad, ui->screenshotOverlayButtonPad,
-                      ui->settingsButtonPad, ui->frameGenButtonPad,  ui->dlss5ButtonPad};
+                      ui->settingsButtonPad, ui->frameGenButtonPad};
 
     KBButtonsList = {ui->fpsButtonKB,
                      ui->quitButtonKB,
@@ -66,8 +66,7 @@ Hotkeys::Hotkeys(std::shared_ptr<IpcClient> ipc_client, bool isGameRunning, QWid
                      ui->screenshotButtonKB,
                      ui->screenshotOverlayButtonKB,
                      ui->settingsButtonKB,
-                     ui->frameGenButtonKB,
-                     ui->dlss5ButtonKB};
+                     ui->frameGenButtonKB};
 
     connect(ui->buttonBox, &QDialogButtonBox::clicked, this, [this](QAbstractButton* button) {
         if (button == ui->buttonBox->button(QDialogButtonBox::Save)) {
@@ -149,7 +148,6 @@ void Hotkeys::SetDefault() {
     ui->screenshotOverlayButtonPad->setText("unmapped");
     ui->settingsButtonPad->setText("unmapped");
     ui->frameGenButtonPad->setText("unmapped");
-    ui->dlss5ButtonPad->setText("unmapped");
 
     ui->fpsButtonKB->setText("f10");
     ui->quitButtonKB->setText("lctrl, lshift, end");
@@ -162,7 +160,6 @@ void Hotkeys::SetDefault() {
     ui->screenshotOverlayButtonKB->setText("lalt, f12");
     ui->settingsButtonKB->setText("f3");
     ui->frameGenButtonKB->setText("1");
-    ui->dlss5ButtonKB->setText("2");
 
     ui->mouseJoystickButton->setText("f7");
     ui->mouseGyroButton->setText("f6");
@@ -223,9 +220,6 @@ void Hotkeys::SaveHotkeys(bool CloseOnSave) {
     add_mapping(ui->frameGenButtonKB->text(), "hotkey_toggle_frame_generation");
     lines.push_back("");
 
-    add_mapping(ui->dlss5ButtonPad->text(), "hotkey_toggle_dlss5");
-    add_mapping(ui->dlss5ButtonKB->text(), "hotkey_toggle_dlss5");
-    lines.push_back("");
 
     lines.push_back("");
 
@@ -383,10 +377,6 @@ void Hotkeys::LoadHotkeys() {
             controllerInputDetected
                 ? ui->frameGenButtonPad->setText(QString::fromStdString(input_string))
                 : ui->frameGenButtonKB->setText(QString::fromStdString(input_string));
-        } else if (output_string.contains("hotkey_toggle_dlss5")) {
-            controllerInputDetected
-                ? ui->dlss5ButtonPad->setText(QString::fromStdString(input_string))
-                : ui->dlss5ButtonKB->setText(QString::fromStdString(input_string));
         } else if (output_string.contains("hotkey_emulator_settings")) {
             controllerInputDetected
                 ? ui->settingsButtonPad->setText(QString::fromStdString(input_string))

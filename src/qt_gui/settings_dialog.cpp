@@ -818,7 +818,6 @@ void SettingsDialog::LoadValuesFromConfig() {
             lemonFgMultiplierComboBox->findData(EmulatorSettings.GetLemonFgMultiplier());
         lemonFgMultiplierComboBox->setCurrentIndex(multiplierIndex >= 0 ? multiplierIndex : 0);
     }
-    LoadDlss5Settings();
     antiAliasingCheckBox->setChecked(EmulatorSettings.IsAntiAliasing());
     SyncImageQualityComboBoxes();
     brightnessSlider->setValue(EmulatorSettings.GetBrightness());
@@ -1271,7 +1270,6 @@ void SettingsDialog::UpdateSettings(bool is_specific) {
                                              is_specific);
     EmulatorSettings.SetLemonFgMultiplier(lemonFgMultiplierComboBox->currentData().toUInt(),
                                           is_specific);
-    SaveDlss5Settings();
     EmulatorSettings.SetAntiAliasing(antiAliasingCheckBox->isChecked(), is_specific);
     EmulatorSettings.SetResolutionScale(resolutionScaleComboBox->currentData().toUInt(),
                                         is_specific);
@@ -1687,7 +1685,7 @@ void SettingsDialog::SetupNavigation() {
     const std::array<Page, 10> pages{{
         {":/images/settings_icon.png", tr("Console, audio and CPU")},
         {":/images/themes_icon.png", tr("Launcher look, updates and compatibility")},
-        {":/images/fullscreen_icon.png", tr("Display, upscaling, frame generation and DLSS5")},
+        {":/images/fullscreen_icon.png", tr("Display, upscaling and frame generation")},
         {":/images/users.png", tr("Profiles and trophies")},
         {":/images/controller_icon.png", tr("Controllers, cursor, camera and USB devices")},
         {":/images/website.png", tr("Online services and connection")},
@@ -2090,132 +2088,6 @@ void SettingsDialog::SetupGraphicsExtras() {
 
     ui->graphicsTabLayoutRight->insertWidget(
         ui->graphicsTabLayoutRight->indexOf(ui->FSRGroupBox) + 1, imageQualityGroupBox);
-
-    // DLSS5, which the emulator's renderer runs on the game picture; the options live in the
-    // emulator's user/dlss5.json and are applied when a game starts.
-    dlss5GroupBox = new QGroupBox(tr("DLSS5"), this);
-    dlss5GroupBox->setObjectName("dlss5GroupBox");
-    auto* dlss5Layout = new QVBoxLayout(dlss5GroupBox);
-
-    dlss5CheckBox = new QCheckBox(tr("DLSS5 Neural Rendering"), dlss5GroupBox);
-    dlss5CheckBox->setObjectName("dlss5CheckBox");
-    dlss5CheckBox->setToolTip(
-        tr("Runs NVIDIA's DLSS5 neural renderer on the game picture inside the emulator, in a "
-           "window or full screen. It needs an NVIDIA RTX card and nvngx_dlssnr.dll in "
-           "qtplugins\\DLSS5. The key that turns it on and off is set in Hotkeys (default: 2)."));
-    dlss5Layout->addWidget(dlss5CheckBox);
-
-    const auto addDlss5Row = [this, dlss5Layout](QWidget* label, QWidget* control) {
-        auto* row = new QHBoxLayout();
-        row->addWidget(label, 0);
-        row->addWidget(control, 1);
-        dlss5Layout->addLayout(row);
-    };
-
-    const auto addDlss5SliderRow = [this](QVBoxLayout* target, const QString& label,
-                                          QSlider*& slider, int min, int max, int initial) {
-        auto* row = new QHBoxLayout();
-        row->addWidget(new QLabel(label, dlss5GroupBox), 0);
-        slider = new QSlider(Qt::Horizontal, dlss5GroupBox);
-        slider->setRange(min, max);
-        auto* valueLabel = new QLabel(dlss5GroupBox);
-        valueLabel->setMinimumWidth(40);
-        QObject::connect(slider, &QSlider::valueChanged, valueLabel, [valueLabel](int value) {
-            valueLabel->setText(QString::number(value * 0.01, 'f', 2));
-        });
-        slider->setValue(initial);
-        valueLabel->setText(QString::number(initial * 0.01, 'f', 2));
-        row->addWidget(slider, 1);
-        row->addWidget(valueLabel);
-        target->addLayout(row);
-    };
-    dlss5NetworkComboBox = new QComboBox(dlss5GroupBox);
-    dlss5NetworkComboBox->setObjectName("dlss5NetworkComboBox");
-    dlss5NetworkComboBox->addItem(tr("Default"), 0);
-    dlss5NetworkComboBox->addItem(tr("Full Quality"), 1);
-    dlss5NetworkComboBox->addItem(tr("Fast"), 2);
-    dlss5NetworkComboBox->setToolTip(
-        tr("Neural network DLSS5 runs. Full Quality looks best; Fast uses a smaller network that "
-           "costs less GPU time."));
-    addDlss5Row(new QLabel(tr("Network:"), dlss5GroupBox), dlss5NetworkComboBox);
-    addDlss5SliderRow(dlss5Layout, tr("DLSS5 Intensity:"), dlss5IntensitySlider, 0, 100, 100);
-
-    // Fine tuning: the NGX style and the three strengths.
-    auto* fineTuneBox = new QGroupBox(tr("DLSS5 Fine Tuning"), dlss5GroupBox);
-    fineTuneBox->setObjectName("dlss5FineTuneGroupBox");
-    auto* fineTuneLayout = new QVBoxLayout(fineTuneBox);
-
-    auto* styleRow = new QHBoxLayout();
-    styleRow->addWidget(new QLabel(tr("Style:"), fineTuneBox), 0);
-    dlss5StyleComboBox = new QComboBox(fineTuneBox);
-    dlss5StyleComboBox->setObjectName("dlss5StyleComboBox");
-    const QString styles[] = {tr("Standard"), tr("Natural"), tr("Cinematic")};
-    for (int index = 0; index < 3; ++index) {
-        dlss5StyleComboBox->addItem(styles[index], index);
-    }
-    styleRow->addWidget(dlss5StyleComboBox, 1);
-    fineTuneLayout->addLayout(styleRow);
-
-    addDlss5SliderRow(fineTuneLayout, tr("Global Tone:"), dlss5GlobalToneSlider, 0, 200, 100);
-    addDlss5SliderRow(fineTuneLayout, tr("Local Tone:"), dlss5LocalToneSlider, 0, 200, 0);
-    addDlss5SliderRow(fineTuneLayout, tr("Local Structure:"), dlss5LocalStructureSlider, 0, 200,
-                      100);
-    addDlss5SliderRow(fineTuneLayout, tr("Skin Structure:"), dlss5SkinStructureSlider, -100, 250,
-                      100);
-    dlss5Layout->addWidget(fineTuneBox);
-
-    ui->graphicsTabLayoutLeft->insertWidget(
-        ui->graphicsTabLayoutLeft->indexOf(ui->graphicsAdapterGroupBox) + 1, dlss5GroupBox);
-}
-
-void SettingsDialog::LoadDlss5Settings() {
-    QJsonObject j;
-    const std::filesystem::path path =
-        Common::FS::GetUserPath(Common::FS::PathType::UserDir) / "dlss5.json";
-    if (QFile file(QString::fromStdString(path.string())); file.open(QIODevice::ReadOnly)) {
-        j = QJsonDocument::fromJson(file.readAll()).object();
-    }
-
-    const auto selectData = [](QComboBox* box, const QVariant& data) {
-        QSignalBlocker blocker(box);
-        const int index = box->findData(data);
-        box->setCurrentIndex(index >= 0 ? index : 0);
-    };
-    const auto setSlider = [](QSlider* slider, double value, double min, double max) {
-        slider->setValue(qRound(qBound(min, value, max) * 100.0));
-    };
-
-    dlss5CheckBox->setChecked(j.value("Enabled").toBool(false));
-    selectData(dlss5StyleComboBox, qBound(0, j.value("Style").toInt(1), 2));
-    selectData(dlss5NetworkComboBox, qBound(0, j.value("Preset").toInt(1), 2));
-    setSlider(dlss5IntensitySlider, j.value("Intensity").toDouble(1.0), 0.0, 1.0);
-    setSlider(dlss5GlobalToneSlider, j.value("GlobalTone").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5LocalToneSlider, j.value("LocalTone").toDouble(0.0), 0.0, 2.0);
-    setSlider(dlss5LocalStructureSlider, j.value("LocalStructure").toDouble(1.0), 0.0, 2.0);
-    setSlider(dlss5SkinStructureSlider, j.value("SkinStructure").toDouble(1.0), -1.0, 2.5);
-}
-
-void SettingsDialog::SaveDlss5Settings() {
-    QJsonObject j;
-    j["Enabled"] = dlss5CheckBox->isChecked();
-    j["Style"] = dlss5StyleComboBox->currentData().toInt();
-    j["Preset"] = dlss5NetworkComboBox->currentData().toInt();
-    j["Intensity"] = dlss5IntensitySlider->value() * 0.01;
-    j["GlobalTone"] = dlss5GlobalToneSlider->value() * 0.01;
-    j["LocalTone"] = dlss5LocalToneSlider->value() * 0.01;
-    j["LocalStructure"] = dlss5LocalStructureSlider->value() * 0.01;
-    j["SkinStructure"] = dlss5SkinStructureSlider->value() * 0.01;
-
-    const std::filesystem::path dir = Common::FS::GetUserPath(Common::FS::PathType::UserDir);
-    std::error_code ec;
-    std::filesystem::create_directories(dir, ec);
-    const std::filesystem::path path = dir / "dlss5.json";
-    QFile file(QString::fromStdString(path.string()));
-    if (!file.open(QIODevice::WriteOnly)) {
-        LOG_ERROR(Config, "Could not write {}", path.string());
-        return;
-    }
-    file.write(QJsonDocument(j).toJson(QJsonDocument::Indented));
 }
 
 void SettingsDialog::SyncImageQualityComboBoxes() {
