@@ -1,11 +1,11 @@
 ## Latest build
 
-**shadPS4 COD** (emulator `0e12b788`) and **shadPS4QtLauncher** — fork by vsajjadx
+**shadPS4 COD** (emulator `bbeb74bc`) and **shadPS4QtLauncher** — fork by vsajjadx
 
 ### Emulator
+- **Endless hang in time conversion fixed** — They Always Run (#13), Desperados III (#14) and Rustler (#19) froze because local time and UTC conversion never agreed on daylight saving time.
 - **DLSS5 removed.** It cut the frame rate to a third (NHL 24: 149 fps off, 50 on) and caused
   blur, ghosting and flicker, so it is gone, including its key `2` and its settings.
-- **They Always Run** no longer stays on a black screen (local time conversion fixed, issue #13).
 - **Giana Sisters: Twisted Dreams** no longer crashes loading the first level (geometry shader divide by zero, issue #12).
 - **Synced with the official shadPS4** (upstream main 4788f0b1, 56 commits) while keeping every fix of this fork.
 - **NHL 24 — flickering lights, lines on the fog and GPU hang fixed again.** Dynamic resolution keeps one image per surface, also when the mip count differs, and a resized surface now starts cleared instead of from stale memory (that memory held huge HDR values that bloom turned into lights and lines).
