@@ -273,6 +273,14 @@ void IpcClient::setRcas(bool enable) {
     writeLine(enable ? "1" : "0");
 }
 
+void IpcClient::setFrameGeneration(bool enable) {
+    if (!supportedCapabilities["frame_generation_control"]) {
+        return;
+    }
+    writeLine("SET_FRAME_GENERATION");
+    writeLine(enable ? "1" : "0");
+}
+
 void IpcClient::setRcasAttenuation(int value) {
     writeLine("SET_RCAS_ATTENUATION");
     writeLine(QString::number(value));
@@ -420,6 +428,8 @@ void IpcClient::onStderr() {
             supportedCapabilities["memory_patch"] = true;
         } else if (text == "ENABLE_EMU_CONTROL") {
             supportedCapabilities["emu_control"] = true;
+        } else if (text == "ENABLE_FRAME_GENERATION_CONTROL") {
+            supportedCapabilities["frame_generation_control"] = true;
         } else if (text == "#IPC_END" && !handshakeComplete && !stopping) {
             handshakeComplete = true;
             startupTimer->stop();

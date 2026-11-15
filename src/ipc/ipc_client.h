@@ -38,6 +38,7 @@ public:
     void toggleFullscreen();
     void adjustVol(int volume, bool game_specific);
     void setFsr(bool enable);
+    void setFrameGeneration(bool enable);
     void setRcas(bool enable);
     void setRcasAttenuation(int value);
     void reloadInputs(std::string config);
@@ -66,6 +67,7 @@ public:
     std::unordered_map<std::string, bool> supportedCapabilities{
         {"memory_patch", false},
         {"emu_control", false},
+        {"frame_generation_control", false},
     };
 
 private:

@@ -540,6 +540,12 @@ SettingsDialog::SettingsDialog(std::shared_ptr<gui_settings> gui_settings,
                 m_ipc_client->setFsr(state);
             }
         });
+        connect(frameGenCheckBox, &QCheckBox::checkStateChanged, this,
+                [this](Qt::CheckState state) {
+                    if (is_game_specific == EmulatorState::GetInstance()->IsGameSpecifigConfigUsed()) {
+                        m_ipc_client->setFrameGeneration(state == Qt::Checked);
+                    }
+                });
 
         connect(
             ui->RCASCheckBox, &QCheckBox::checkStateChanged, this, [this](Qt::CheckState state) {
@@ -1093,15 +1099,15 @@ void SettingsDialog::updateNoteTextEdit(const QString& elementName) {
     } else if (elementName == "anisotropicComboBox") {
         text = tr("Anisotropic Filtering:\\nSharper textures on angled surfaces. Off keeps the game's setting.");
     } else if (elementName == "frameGenBackendComboBox") {
-        text = tr("Frame Generation Method:\\nFSR 3.1: AMD frame generation.\\nMulti FG: works on any GPU, supports 2x-6x. Fast small objects may smear.");
+        text = tr("Frame Generation Method:\\nFSR 3.1: AMD frame generation.\\nMulti FG: supports 2x, 3x, 4x and 6x on compatible GPUs. Fast small objects may smear. Restart the game after changing the method.");
     } else if (elementName == "lemonFgHighQualityCheckBox") {
-        text = tr("High Quality:\\nFiner motion search, less smearing, more GPU time.");
+        text = tr("High Quality:\\nFiner motion search, less smearing, more GPU time. Requires a game restart.");
     } else if (elementName == "lemonFgHudProtectionCheckBox") {
-        text = tr("HUD Protection:\\nKeeps static HUD in place. Turn off if parts of the scene look frozen.");
+        text = tr("HUD Protection:\\nKeeps static HUD in place. Turn off if parts of the scene look frozen. Requires a game restart.");
     } else if (elementName == "lemonFgMultiplierComboBox") {
-        text = tr("Multiplier:\\nFrames shown per game frame. Match it to your refresh rate; higher costs more GPU and VRAM.");
+        text = tr("Multiplier:\\nTarget output frames per game frame. Actual display rate is limited by the monitor. Higher values cost more GPU time and VRAM. Requires a game restart.");
     } else if (elementName == "frameGenCheckBox") {
-        text = tr("Frame Generation:\\nInserts generated frames for smoother motion. Best above 30 FPS. Toggle key is set in Hotkeys (default 1).");
+        text = tr("Frame Generation:\\nInserts generated frames for smoother motion. Requires SDR output. Best above 30 FPS. Toggle key is set in Hotkeys (default 1). Live on/off requires a core with frame generation control support.");
     } else if (elementName == "heightDivider") {
         text = tr("Vblank Frequency:\\nEmulated display refresh. Keep 60 Hz; other values can speed up or break games.");
     } else if (elementName == "dumpShadersCheckBox") {
@@ -1437,6 +1443,9 @@ void SettingsDialog::SyncRealTimeWidgetstoConfig() {
 
     if (EmulatorState::GetInstance()->IsGameRunning()) {
         m_ipc_client->setFsr(EmulatorSettings.IsFsrEnabled());
+        if (is_game_specific == EmulatorState::GetInstance()->IsGameSpecifigConfigUsed()) {
+            m_ipc_client->setFrameGeneration(EmulatorSettings.IsFrameGenerationEnabled());
+        }
         m_ipc_client->setRcas(EmulatorSettings.IsRcasEnabled());
         m_ipc_client->setRcasAttenuation(EmulatorSettings.GetRcasAttenuation());
     }
@@ -1990,20 +1999,27 @@ void SettingsDialog::SetupGraphicsExtras() {
 
     frameGenBackendComboBox = new QComboBox(ui->FSRGroupBox);
     frameGenBackendComboBox->setObjectName("frameGenBackendComboBox");
+    frameGenBackendComboBox->setToolTip(
+        tr("Restart the game after changing the frame generation method."));
     frameGenBackendComboBox->addItem(tr("FSR 3.1"), QStringLiteral("FSR"));
     frameGenBackendComboBox->addItem(tr("Multi FG"), QStringLiteral("Lemon"));
     ui->verticalLayout_5->insertWidget(1, frameGenBackendComboBox);
 
     lemonFgHighQualityCheckBox = new QCheckBox(tr("Multi FG: High Quality"), ui->FSRGroupBox);
     lemonFgHighQualityCheckBox->setObjectName("lemonFgHighQualityCheckBox");
+    lemonFgHighQualityCheckBox->setToolTip(
+        tr("Restart the game after changing frame generation quality."));
     ui->verticalLayout_5->insertWidget(2, lemonFgHighQualityCheckBox);
 
     lemonFgHudProtectionCheckBox = new QCheckBox(tr("Multi FG: HUD Protection"), ui->FSRGroupBox);
     lemonFgHudProtectionCheckBox->setObjectName("lemonFgHudProtectionCheckBox");
+    lemonFgHudProtectionCheckBox->setToolTip(tr("Restart the game after changing HUD protection."));
     ui->verticalLayout_5->insertWidget(3, lemonFgHudProtectionCheckBox);
 
     lemonFgMultiplierComboBox = new QComboBox(ui->FSRGroupBox);
     lemonFgMultiplierComboBox->setObjectName("lemonFgMultiplierComboBox");
+    lemonFgMultiplierComboBox->setToolTip(
+        tr("Restart the game after changing the frame generation multiplier."));
     for (const uint multiplier : {2u, 3u, 4u, 6u}) {
         lemonFgMultiplierComboBox->addItem(tr("Multi FG: %1x").arg(multiplier), multiplier);
     }
