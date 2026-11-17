@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <iostream>
+#include <memory>
 
 #include <QDir>
 #include <QProcessEnvironment>
@@ -9,6 +10,7 @@
 #include <QTimer>
 
 #include "common/logging/log.h"
+#include "common/windows_process.h"
 #include "ipc_client.h"
 
 #ifdef Q_OS_WIN
@@ -187,7 +189,22 @@ void IpcClient::startEmulator(const QFileInfo& exe, const QStringList& args, con
     }
     sawWindow = false;
     noWindowTicks = 0;
+#ifdef Q_OS_WIN
+    auto startup_info = std::make_shared<Common::WindowsProcessStartupInfo>();
+    if (startup_info->Error() != ERROR_SUCCESS) {
+        emit EmulatorError(tr("Could not prepare the emulator address space (Windows error %1).")
+                               .arg(startup_info->Error()));
+        return;
+    }
+#endif
     process = new QProcess(this);
+#ifdef Q_OS_WIN
+    process->setCreateProcessArgumentsModifier(
+        [startup_info](QProcess::CreateProcessArguments* args) {
+            args->startupInfo = startup_info->Apply(*args->startupInfo);
+            args->flags |= EXTENDED_STARTUPINFO_PRESENT;
+        });
+#endif
 
     connect(process, &QProcess::readyReadStandardError, this, [this] { onStderr(); });
     connect(process, &QProcess::readyReadStandardOutput, this, [this] { onStdout(); });

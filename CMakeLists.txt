@@ -80,6 +80,7 @@ string(TIMESTAMP BUILD_DATE "%Y-%m-%d %H:%M:%S")
 message("start git things")
 
 execute_process(
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMAND git rev-list --count @
   OUTPUT_VARIABLE GIT_REV_LIST_NUMBER
   RESULT_VARIABLE GIT_REV_LIST_RESULT
@@ -90,6 +91,7 @@ execute_process(
 # Try to get the upstream remote and branch
 message("check for remote and branch")
 execute_process(
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMAND git rev-parse --abbrev-ref --symbolic-full-name @{u}
   OUTPUT_VARIABLE GIT_REMOTE_NAME
   RESULT_VARIABLE GIT_REMOTE_RESULT
@@ -101,6 +103,7 @@ execute_process(
 if (GIT_REMOTE_RESULT OR GIT_REMOTE_NAME STREQUAL "")
   message(STATUS "check default push")
   execute_process(
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMAND git config --get remote.pushDefault
     OUTPUT_VARIABLE GIT_REMOTE_NAME
     RESULT_VARIABLE GIT_REMOTE_RESULT
@@ -169,6 +172,7 @@ endif()
 # Get remote link
 message(STATUS "getting remote link")
 execute_process(
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMAND git config --get remote.${GIT_REMOTE_NAME}.url
   OUTPUT_VARIABLE GIT_REMOTE_URL
   OUTPUT_STRIP_TRAILING_WHITESPACE
